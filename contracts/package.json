@@ -1,0 +1,21 @@
+{
+  "name": "envoy-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "envoy Solidity contracts — agent identity, escrow, reputation, policy guard on Celo",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:alfajores": "hardhat run scripts/deploy.ts --network alfajores",
+    "deploy:celo": "hardhat run scripts/deploy.ts --network celo",
+    "verify": "hardhat verify"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "hardhat": "^2.22.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.7.0",
+    "dotenv": "^16.4.0"
+  }
+}

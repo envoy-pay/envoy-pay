@@ -1,0 +1,229 @@
+// envoy — Celo-first agent payment SDK (x402 + MPP) with on-chain contracts
+// https://envoy.dev
+
+// Core
+export { EnvoyClient, EnvoyClientOptions } from './client';
+export { PolicyEngine, BudgetPolicy } from './policy';
+export type { Logger } from './logger';
+
+// MPP Protocol utilities
+export {
+  parseMppChallenge,
+  parseMppChallenges,
+  decodeChallengeRequest,
+  buildMppCredential,
+  buildAuthorizationHeader,
+  parseMppReceipt,
+  detectProtocol,
+  extractMppChallenges,
+  base64urlEncode,
+  base64urlDecode,
+} from './mpp';
+export type {
+  MppChallenge,
+  MppCredential,
+  MppRequestObject,
+  MppStripePayload,
+  MppTempoPayload,
+  MppReceipt,
+  MppMethod,
+  MppIntent,
+} from './mpp';
+
+// Adapters — Universal EVM (recommended for on-chain x402)
+export { EvmPaymentAdapter, listEvmChains } from './adapters/evm';
+export type { EvmAdapterOptions, EvmChainName } from './adapters/evm';
+
+// Adapters — Stripe MPP (fiat + stablecoins via Shared Payment Tokens)
+export { StripePaymentAdapter } from './adapters/stripe';
+export type { StripeAdapterOptions } from './adapters/stripe';
+
+// Adapters — Stellar
+export { StellarPaymentAdapter } from './adapters/stellar';
+export type { StellarPaymentAdapterOptions } from './adapters/stellar';
+
+// Adapters — Solana (SOL + USDC SPL, mainnet/devnet/testnet)
+export { SolanaPaymentAdapter } from './adapters/solana';
+export type { SolanaAdapterOptions } from './adapters/solana';
+
+// Adapters — Base (backward compat, use EvmPaymentAdapter instead)
+export { BasePaymentAdapter } from './adapters/base';
+export type { BaseAdapterOptions } from './adapters/base';
+
+// Adapters — OWS (Open Wallet Standard — local key management + policy-gated signing)
+export {
+  createOwsAdapter,
+  createOwsPolicy,
+  createOwsAgentKey,
+  importOwsWallet,
+  importOwsWalletFromKey,
+  exportOwsWallet,
+  listOwsWallets,
+  deleteOwsWallet,
+} from './adapters/ows';
+export type { OwsAdapterOptions } from './adapters/ows';
+
+// Providers — OnchainOS (OKX DEX Aggregator, 400+ DEX sources, X Layer native)
+export { OnchainOSProvider, createOnchainOSFromEnv } from './providers/onchainos';
+export type { OnchainOSConfig, DexQuoteParams, DexSwapParams, DexQuoteResult, DexSwapResult } from './providers/onchainos';
+
+// Providers — Cross-Chain Bridge (9 chains, USDC bridge, two-step routing)
+export { CrossChainBridge } from './providers/bridge';
+export type { BridgeQuoteParams, BridgeQuoteResult, BridgeRoute, BridgeStatus, CrossChainBridgeConfig } from './providers/bridge';
+
+// Interface
+export type {
+  PaymentAdapter,
+  WatchOptions,
+  IncomingPayment,
+  PaymentRequestOptions,
+  PaymentRequest,
+  Unsubscribe,
+} from './adapters/types';
+
+// Server — Pay In: 402 gating middleware
+export {
+  createX402Gate,
+  createMppGate,
+  createPaymentGate,
+  createWebhookHandler,
+  buildReceipt,
+} from './server';
+export type {
+  X402GateConfig,
+  X402Proof,
+} from './server/x402-gate';
+export type {
+  MppGateConfig,
+} from './server/mpp-gate';
+export type {
+  PaymentGateConfig,
+} from './server/payment-gate';
+export type {
+  WebhookConfig,
+  WebhookEvent,
+} from './server/webhook';
+export type {
+  ReceiptOptions,
+  PaymentReceipt,
+} from './server/receipt';
+
+// Monitor — Pay In: Real-time payment watchers
+export {
+  createEvmWatcher,
+  createStellarWatcher,
+  createSolanaWatcher,
+  createMultiChainWatcher,
+} from './monitor';
+export type { EvmWatcherConfig } from './monitor/evm-watcher';
+export type { StellarWatcherConfig } from './monitor/stellar-watcher';
+export type { SolanaWatcherConfig } from './monitor/solana-watcher';
+export type { MultiChainWatcherConfig } from './monitor/multi-watcher';
+
+// Requests — Pay In: Payment request URI generators
+export {
+  buildEip681Uri,
+  buildSep7Uri,
+  buildSolanaPayUri,
+  buildPaymentUri,
+} from './requests';
+export type { Eip681Options } from './requests/eip681';
+export type { Sep7Options } from './requests/sep7';
+export type { SolanaPayOptions } from './requests/solana-pay';
+export type { UniversalPaymentUriOptions } from './requests/universal';
+
+// Wallet — Unified multi-chain wallet abstraction
+export {
+  UnifiedWallet,
+  BalanceAggregator,
+  ChainRouter,
+  IntentResolver,
+  SessionManager,
+} from './wallet';
+export type {
+  UnifiedWalletOptions,
+  UnifiedBalance,
+  ChainBalance,
+  PayIntent,
+  PaymentPlan,
+  PayResult,
+  RoutingStrategy,
+  Session,
+  SessionPermissions,
+  ChainMeta,
+} from './wallet';
+
+// Identity — Agent identity, reputation, and ownership (ERC-8004 + W3C DID)
+export {
+  AgentIdentity,
+  DIDResolver,
+  AgentCard,
+  Reputation,
+  OwnerRegistry,
+} from './identity';
+export type {
+  AgentDID,
+  DIDDocument,
+  VerificationMethod,
+  ServiceEndpoint,
+  AgentCardData,
+  AgentIdentityOptions,
+  ReputationAttestation,
+  ReputationCategory,
+  ReputationProfile,
+  CreateAttestationOptions,
+  OwnerRecord,
+  DelegationLevel,
+  ResolvedIdentity,
+  ResolveOptions,
+} from './identity';
+
+// Contracts — On-chain layer (Celo): agent registry, escrow, reputation, policy guard
+export {
+  AgentRegistryClient,
+  createAgentRegistry,
+  EscrowClient,
+  createEscrow,
+  ReputationClient,
+  createReputation,
+  PolicyGuardClient,
+  createPolicyGuard,
+  ENVOY_CONTRACT_ADDRESSES,
+  getEnvoyAddresses,
+  ENVOY_AGENT_REGISTRY_ABI,
+  ENVOY_ESCROW_ABI,
+  ENVOY_REPUTATION_ABI,
+  ENVOY_POLICY_GUARD_ABI,
+} from './contracts';
+export type {
+  AgentRecord,
+  AgentRegistryOptions,
+  DepositRecord,
+  EscrowOptions,
+  ReleaseSignaturePayload,
+  OnChainAttestation,
+  ReputationOptions,
+  PolicyState,
+  PolicyGuardOptions,
+  EnvoyContractAddresses,
+} from './contracts';
+
+// Facilitator — Revenue engine (hosted payment facilitation)
+export {
+  FacilitatorService,
+  FeeCalculator,
+  PRICING_TIERS,
+  CARD_TIERS,
+} from './facilitator';
+export type {
+  PricingPlan,
+  PricingTier,
+  ApiKeyRecord,
+  FacilitateRequest,
+  FacilitateResponse,
+  FeeBreakdown,
+  UsageRecord,
+  RevenueSummary,
+  CardPlan,
+  CardTier,
+} from './facilitator';

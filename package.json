@@ -1,0 +1,112 @@
+{
+  "name": "envoy-pay",
+  "version": "0.1.0",
+  "description": "envoy — agent payment SDK on Celo. Celo-first multi-chain payments (x402 + MPP), agent identity (DID + ERC-8004), on-chain escrow, policy engine, and wallet abstraction. Solidity contracts for trust-minimized agent commerce.",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:types": "tsc -p tsconfig.types.json",
+    "build": "rm -rf dist && npm run build:cjs && npm run build:esm && npm run build:types",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "contracts:compile": "cd contracts && npx hardhat compile",
+    "contracts:test": "cd contracts && npx hardhat test",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "keywords": [
+    "envoy",
+    "envoy-pay",
+    "celo",
+    "celo-payments",
+    "cusd",
+    "ceur",
+    "ai-agent-payments",
+    "autonomous-agent-payments",
+    "agent-to-agent-payments",
+    "agentic-commerce",
+    "machine-to-machine-payments",
+    "x402",
+    "x402-protocol",
+    "mpp",
+    "machine-payments-protocol",
+    "402-payment-required",
+    "http-402",
+    "ai-agent-sdk",
+    "ai-agent-financial-identity",
+    "agent-wallet",
+    "agent-virtual-card",
+    "policy-engine",
+    "agent-escrow",
+    "agent-identity",
+    "erc-8004",
+    "stripe",
+    "circle",
+    "usdc",
+    "base",
+    "arbitrum",
+    "optimism",
+    "polygon",
+    "stellar",
+    "solana",
+    "evm",
+    "multi-chain",
+    "langchain",
+    "crewai",
+    "mcp-server",
+    "open-wallet-standard"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "envoy <team@envoy.dev>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/envoy-dev/envoy"
+  },
+  "homepage": "https://envoy.dev",
+  "bugs": {
+    "url": "https://github.com/envoy-dev/envoy/issues"
+  },
+  "dependencies": {
+    "@open-wallet-standard/core": "^1.2.4",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "@stellar/stellar-sdk": "^13.3.0",
+    "axios": "^1.14.0",
+    "viem": "^2.47.6"
+  },
+  "peerDependencies": {
+    "stripe": ">=16.0.0"
+  },
+  "peerDependenciesMeta": {
+    "stripe": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
+  }
+}
