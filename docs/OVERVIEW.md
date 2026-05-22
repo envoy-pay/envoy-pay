@@ -24,6 +24,47 @@ Option 2 is terrifying — you've given a probabilistic, sometimes-hallucinating
 
 ---
 
+## See it in one picture
+
+```
+┌──────────────┐   ① POST /send-sms                ┌───────────────────┐
+│  AI Agent    │ ──────────────────────────────►   │   SMS Gateway     │
+│  + envoy SDK │                                   │  (Node.js, Task#6)│
+│              │   ② 402 + x402 challenge          │                   │
+│              │ ◄──────────────────────────────── │                   │
+│              │                                   │                   │
+│              │   ⑤ retry w/ X-PAYMENT header    │                   │
+│              │ ──────────────────────────────►   │                   │
+└──────┬───────┘                                   └─────────┬─────────┘
+       │ ③ check policy                                      │ ⑥ verify
+       │ ④ pay()                                             │   on-chain
+       ▼                                                     │ ⑦ call API
+┌─────────────────────────────────────────────────────────┐  │
+│                       Celo blockchain                    │  │
+│                                                          │  │
+│   EnvoyFacilitator (ours)  ◄──► ERC-8004 Identity      │  │
+│   • verifies EIP-712 sig         (canonical, 0x8004…)   │  │
+│   • enforces spending limit      • getAgentWallet(id)   │  │
+│   • splits net + fee                                     │  │
+│   • emits Settled event                                  │  │
+│            │                                              │  │
+│            ▼                                              │  │
+│        Mento cKES tokens                                  │  │
+└─────────────────────────────────────────────────────────┘  │
+                                                              ▼
+                                                  ┌─────────────────────┐
+                                                  │  Africa's Talking   │
+                                                  │  SMS API (real)     │
+                                                  └──────────┬──────────┘
+                                                             │
+                                                             ▼
+                                                    📱 phone rings in Lagos
+```
+
+The numbers map to the sequence walkthrough further down. Everything inside the dotted box is our code. Everything else (Celo, the canonical ERC-8004 contract, Africa's Talking) already exists — we just compose with it.
+
+---
+
 ## The familiar-system analogy
 
 Think of envoy as **the company-card system for AI agents**, where instead of a corporate card backed by Chase, the "card" is a stablecoin wallet on Celo, and instead of an expense-report tool, the spending rules live in an unforgeable smart contract.
@@ -51,6 +92,81 @@ Why this demo specifically:
 - **Africa's Talking** is a real telecom API that real businesses use today.
 - **A phone buzzing** is the kind of visual that makes a hackathon judge stop scrolling.
 - It targets **Track 1** (Best Agent) + falls into **Track 3** (8004scan rank, because every payment shows up under the agent's ID) + can stretch into **Track 2** (Most Activity, if we run the demo on a 24-hour loop near submission).
+
+### What happens during a single payment (the 13 steps)
+
+These are the numbered events in the diagram above, expanded:
+
+1. **Agent calls the gateway.** `POST /send-sms { to: "+254…", body: "…" }`. No payment attached yet.
+2. **Gateway returns 402.** Body is the x402 challenge: `{ amount: "0.05", asset: "cKES", chain: "celo", recipient: <facilitator-addr>, challengeId: "0x…" }`.
+3. **Envoy SDK in the agent reads the challenge.** Confirms `chain === "celo"` and `asset === "cKES"`. Looks up the agent's current spending policy on-chain.
+4. **SDK calls `EnvoyFacilitator.getLimit(agentId, cKES)`.** Confirms `enabled === true` and `amount <= perTx` and `spentInPeriod + amount <= perPeriod`.
+5. **SDK builds the EIP-712 `PaymentAuth`.** Fields: `{ agentId, token=cKES, merchant=gateway, amount, challengeId, nonce, deadline }`.
+6. **SDK signs with the agent's signing wallet** — the address that canonical 8004 returns from `getAgentWallet(agentId)`.
+7. **SDK calls `EnvoyFacilitator.pay(auth, signature)`** on Celo.
+8. **Contract execution, in order:**
+   a. `block.timestamp <= deadline` ✓
+   b. nonce not previously used ✓
+   c. signer recovered from sig equals `IDENTITY.getAgentWallet(agentId)` ✓
+   d. limit check + lazy period rollover updates `spentInPeriod`
+   e. `cKES.safeTransferFrom(signer, merchant, net)` — most of the amount
+   f. `cKES.safeTransferFrom(signer, treasury, fee)` — our 0.25 %
+   g. `emit Settled(challengeId, agentId, merchant, …)`
+9. **SDK reads the Settled event** from the receipt. Builds the X-PAYMENT header (tx hash + challenge id).
+10. **SDK retries the original request** — `POST /send-sms { to, body }` with `X-PAYMENT: <header>`.
+11. **Gateway verifies the X-PAYMENT proof.** Queries Celo for the Settled event, confirms `challengeId` and `amount` match.
+12. **Gateway calls the real Africa's Talking SMS API**, paying from its prepaid balance in fiat.
+13. **Phone in Lagos rings.** Gateway returns `200 { sent: true, messageId }` to the agent.
+
+The whole sequence: ~5–10 seconds end-to-end. Celo's ~5 s block time is the dominant latency.
+
+---
+
+## Getting started locally
+
+The repo is two workspaces: the SDK at the root (`src/`) and the contracts (`contracts/`). Both need their own `npm install`.
+
+```bash
+# 1. Clone + install
+git clone https://github.com/JemIIahh/envoy.git
+cd envoy
+npm install                          # root SDK deps (viem, vitest, …)
+
+cd contracts
+npm install                          # contracts deps (hardhat, OZ, …)
+
+# 2. Run the tests
+npx hardhat test                     # 23 contract tests, ~1 s
+cd ..
+npx vitest run                       # 496 SDK tests, ~2 s
+
+# 3. Type-check the SDK
+npx tsc --noEmit -p tsconfig.json
+```
+
+If all three pass, your environment is good.
+
+### To actually deploy (Task #5 territory)
+
+You'll need credentials in `contracts/.env` (copy from `.env.example` once Task #5 lands):
+
+```bash
+DEPLOYER_PRIVATE_KEY=0x…             # wallet that deploys (and pays gas)
+CELOSCAN_API_KEY=…                   # for hardhat verify
+TREASURY_ADDRESS=0x…                 # optional; defaults to deployer
+FACILITATOR_FEE_BPS=25               # optional; 0.25 % default, max 200 (2 %)
+```
+
+Get Celo Sepolia CELO for gas from <https://faucet.celo.org/celo-sepolia>. The faucet drops ~1 CELO, way more than enough for our deploys + demo loop.
+
+Then:
+
+```bash
+cd contracts
+npx hardhat run scripts/deploy.ts --network celoSepolia
+# Outputs the EnvoyFacilitator address + a verify command. Paste the
+# address into src/contracts/addresses.ts under chainId 11142220.
+```
 
 ---
 
@@ -132,3 +248,41 @@ There are 5 more tasks. They're all *application-level* work — no more contrac
 | The canonical Celo ERC-8004 helpers (SDK side) | [`src/identity/erc8004/`](../src/identity/erc8004/) |
 | The typed Facilitator viem client | [`src/contracts/facilitator.ts`](../src/contracts/facilitator.ts) |
 | What's archived and why | [`contracts/future/README.md`](../contracts/future/README.md) |
+
+---
+
+## Glossary
+
+The jargon you'll hit reading the code, in the order it usually shows up.
+
+- **AI Agent** — autonomous software, usually LLM-driven, that takes actions on its own. In envoy it's the entity that makes a payment.
+- **Owner** — the human (or DAO) that deployed/created the agent and sets its spending rules. Holds the ERC-8004 NFT.
+- **Agent wallet** — the address authorized to *sign payments* for an agent. Set by the owner via canonical 8004 `setAgentWallet`. Different from the NFT owner — the owner controls the agent, the wallet signs on its behalf. On NFT transfer, the wallet clears automatically.
+- **agentId** — the `uint256` tokenId of the canonical ERC-8004 Identity NFT. Equivalent to "the agent's account number" everywhere in our code.
+- **ERC-8004** — Ethereum standard for agent identity, defined as ERC-721 NFTs plus a reputation registry. Celo deployed a canonical implementation at `0x8004…` (the address prefix is intentional — easy to spot).
+- **Canonical contracts** — the official ERC-8004 Identity and Reputation registries on Celo, not contracts we wrote. We *use* them; we don't reimplement them.
+- **x402** — payment protocol. A server returns HTTP `402 Payment Required` with a JSON challenge; the client pays on-chain, then retries with an `X-PAYMENT` proof header. Coinbase/Cloudflare-originated, named the protocol envoy speaks first-class.
+- **MPP** — the competing payment protocol from Stripe + Tempo. Uses `WWW-Authenticate: Payment` instead of JSON challenges. envoy supports it too via the same SDK.
+- **402 challenge** — the JSON blob a server sends back with the 402 response, telling the client how to pay (amount, chain, asset, recipient, challengeId).
+- **challengeId** — opaque identifier the gateway issues in the 402 challenge. Echoes back in the on-chain `Settled` event so the gateway can match the payment to the original 402.
+- **X-PAYMENT** — HTTP header the client adds on retry, containing proof of the on-chain payment (tx hash + challenge id).
+- **Facilitator** — in x402 terminology, the entity that verifies/settles the payment. Our `EnvoyFacilitator.sol` plays this role on Celo. Not the same as a relayer or paymaster.
+- **PaymentAuth** — the EIP-712 typed-data struct the agent's wallet signs to authorize a single payment: `{ agentId, token, merchant, amount, challengeId, nonce, deadline }`.
+- **EIP-712** — Ethereum standard for structured-data signatures. Lets the agent sign a *meaning* ("I authorize agent #42 to pay 0.05 cKES to address X") instead of an opaque hash.
+- **Nonce** — anti-replay counter per (agentId, nonce). The contract refuses to use the same nonce twice. We use random nonces, not sequential ones.
+- **Settled event** — the on-chain receipt emitted by `EnvoyFacilitator.pay()`. Indexed by challengeId, agentId, and merchant. Contains amount, fee, signer, and the original nonce.
+- **Limit** — per-(agent, token) spending policy. `{ perTx, perPeriod, periodLen, spentInPeriod, periodStart, enabled }`. Stored in the Facilitator. Set by the agent's owner.
+- **Lazy period rollover** — our policy reset pattern: instead of needing a cron to reset daily limits, the next `pay()` after the window elapses zeros `spentInPeriod` automatically. No keeper required.
+- **ERC-1271** — standard for signature verification by contract wallets (Safe, Argent, EIP-7702 EOAs, etc.). Our Facilitator falls back to this when ECDSA recovery doesn't match — so smart-wallet agents work out of the box.
+- **Mento** — protocol that issues Celo's native stablecoins. Mints cUSD, cEUR, cREAL, cKES against a CELO + USDC reserve.
+- **cKES** — Mento's Celo Kenyan Shilling stablecoin. 18 decimals. The currency our demo uses, because Kenya is Celo's biggest market.
+- **cUSD, cEUR, cREAL** — other Mento stablecoins (US dollar, Euro, Brazilian Real).
+- **MiniPay** — Celo-native mobile wallet, 15M+ users primarily across Africa. Why payments-on-Celo is a real market, not a hypothesis.
+- **Celoscan** — block explorer for Celo (Etherscan equivalent). We'll use `https://celoscan.io` and `https://celo-sepolia.blockscout.com` to verify contracts.
+- **8004scan** — separate explorer that indexes ERC-8004 agent activity. The hackathon's Track 3 ($500) ranks agents by 8004scan position.
+- **Self Agent ID** — credential service (`app.ai.self.xyz`) for privacy-first agent identity. Hackathon submission says it's beneficial (not required) for our agent.
+- **Karma** — project registration platform the hackathon uses (<https://karma.app>). Our project page lives there.
+- **Celo Sepolia** — Celo's active testnet, chainId `11142220`. Replaces Alfajores. The canonical ERC-8004 contracts are deployed here for testing.
+- **CEI** — Checks-Effects-Interactions, the standard pattern for reentrancy-safe Solidity. Our `pay()` follows it strictly.
+- **ReentrancyGuardTransient** — OpenZeppelin reentrancy guard that uses EVM transient storage (TSTORE, Cancun-era). Cheaper than the classic storage-based guard.
+- **viem** — modern TypeScript library for Ethereum (alternative to ethers). The SDK uses viem throughout.
