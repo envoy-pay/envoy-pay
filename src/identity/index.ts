@@ -1,4 +1,11 @@
 // Identity Layer — Barrel exports
+//
+// This module ships two layers:
+//   - Off-chain TypeScript primitives (AgentIdentity, DIDResolver, ...) for
+//     building agent cards, resolving DIDs, scoring reputation, etc.
+//   - On-chain helpers under `./erc8004/` for the canonical Celo ERC-8004
+//     Identity + Reputation registries (re-exported as `erc8004` below).
+
 export { AgentIdentity } from './agent-identity';
 export { DIDResolver } from './did-resolver';
 export { AgentCard } from './agent-card';
@@ -20,3 +27,7 @@ export type {
   ResolvedIdentity,
   ResolveOptions,
 } from './types';
+
+// Canonical Celo ERC-8004 helpers — Identity + Reputation registries.
+export * as erc8004 from './erc8004';
+export type { AgentId, CanonicalAgent, MetadataEntry, FeedbackArgs } from './erc8004';

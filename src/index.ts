@@ -153,13 +153,15 @@ export type {
   ChainMeta,
 } from './wallet';
 
-// Identity — Agent identity, reputation, and ownership (ERC-8004 + W3C DID)
+// Identity — Off-chain primitives (AgentIdentity, DIDResolver, ...) + canonical
+// ERC-8004 helpers under the `erc8004` namespace (registerAgent, giveFeedback, ...).
 export {
   AgentIdentity,
   DIDResolver,
   AgentCard,
   Reputation,
   OwnerRegistry,
+  erc8004,
 } from './identity';
 export type {
   AgentDID,
@@ -176,36 +178,32 @@ export type {
   DelegationLevel,
   ResolvedIdentity,
   ResolveOptions,
+  AgentId,
+  CanonicalAgent,
+  MetadataEntry,
+  FeedbackArgs,
 } from './identity';
 
-// Contracts — On-chain layer (Celo): agent registry, escrow, reputation, policy guard
+// Contracts — On-chain layer (Celo): the EnvoyFacilitator viem client.
 export {
-  AgentRegistryClient,
-  createAgentRegistry,
-  EscrowClient,
-  createEscrow,
-  ReputationClient,
-  createReputation,
-  PolicyGuardClient,
-  createPolicyGuard,
   ENVOY_CONTRACT_ADDRESSES,
   getEnvoyAddresses,
-  ENVOY_AGENT_REGISTRY_ABI,
-  ENVOY_ESCROW_ABI,
-  ENVOY_REPUTATION_ABI,
-  ENVOY_POLICY_GUARD_ABI,
+  CELO_MAINNET,
+  CELO_SEPOLIA,
+  createEnvoyFacilitator,
+  signPaymentAuth,
+  paymentAuthDomain,
+  paymentAuthTypedData,
+  PAYMENT_AUTH_TYPES,
+  ENVOY_FACILITATOR_ABI,
 } from './contracts';
 export type {
-  AgentRecord,
-  AgentRegistryOptions,
-  DepositRecord,
-  EscrowOptions,
-  ReleaseSignaturePayload,
-  OnChainAttestation,
-  ReputationOptions,
-  PolicyState,
-  PolicyGuardOptions,
   EnvoyContractAddresses,
+  PaymentAuth,
+  LimitView,
+  SettledEvent,
+  EnvoyFacilitatorClient,
+  EnvoyFacilitatorClientOptions,
 } from './contracts';
 
 // Facilitator — Revenue engine (hosted payment facilitation)

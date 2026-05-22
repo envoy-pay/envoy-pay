@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+For the dated decision journal behind these changes, see [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
+
+## [0.3.0-envoy] — Unreleased
+
+This release is the Celo-first re-imagining of the SDK with a real on-chain layer added. Targets Celo Sepolia (testnet) and Celo mainnet.
+
+### Added
+- Scaffold forked from `ASGCompute-ows-agent-pay`, restructured around Celo as the first-class chain
+- **`EnvoyFacilitator.sol`** — single on-chain payment contract that consumes an EIP-712 `PaymentAuth` from the agent's wallet, validates the signer against canonical ERC-8004 `getAgentWallet(agentId)`, enforces per-(agent, token) rolling-window spending limits atomically, splits the amount into net (→ merchant) and fee (→ treasury), and emits a `Settled(challengeId, agentId, merchant, …)` event. Strict CEI, custom errors, `ReentrancyGuardTransient`, ERC-1271 fallback for smart-wallet agents, zero internal balance (contract never holds funds).
+- `MockIdentityRegistry.sol` + `MockSmartWallet.sol` test fixtures
+- 23-test suite for `EnvoyFacilitator` covering: constructor invariants, `setLimit` authorization via ERC-8004 `isAuthorizedOrOwner`, atomic split + event emission, ERC-1271 contract-wallet flow, expired auths, wrong-signer rejection, NFT-transfer-revokes-wallet behavior, nonce reuse, per-tx and per-period exceed, lazy window rollover, treasury rotation, and on-chain ↔ off-chain typed-data hash parity
+- **`src/identity/erc8004/`** — viem-based helpers for the canonical Celo ERC-8004 Identity and Reputation registries. Functional, pure, no global state. Exported under `import { erc8004 } from 'envoy-pay'` and individual function exports. Covers: `registerAgent` (all three overloads), `setAgentWallet`, `unsetAgentWallet`, `setAgentURI`, `setMetadata`, `getAgent`/`getAgentWallet`/`getAgentOwner`/`getAgentURI`/`getMetadata`, `isAuthorizedOrOwner`, EIP-712 `agentWalletRotationTypedData` builder, `giveFeedback`, `revokeFeedback`, and a `makeScoreFeedback` convenience helper.
+- **`src/contracts/facilitator.ts`** — typed viem client for `EnvoyFacilitator`. Exposes pure helpers (`paymentAuthDomain`, `paymentAuthTypedData`, `signPaymentAuth`) and a `createEnvoyFacilitator(...)` factory that bundles reads (`getFeeBps`, `getLimit`, `isNonceUsed`, `paymentAuthHash`, ...), writes (`setLimit`, `disableLimit`, `setTreasury`, `pay`), and EIP-712 signing in one object. `pay()` waits for the receipt and returns a decoded `Settled` event including `txHash` + `blockNumber`.
+- **`src/contracts/abis/EnvoyFacilitator.ts`** — minimal hand-curated ABI, `as const` for viem type inference. Carries only the function/event signatures the SDK touches.
+- `src/__tests__/facilitator.test.ts` — 6 vitest cases verifying EIP-712 signing: signature → recovered address parity, sensitivity to every PaymentAuth field, chainId-dependent domains, hashTypedData stability, and the exported PAYMENT_AUTH_TYPES shape.
+- `vitest.config.mts` updated to exclude `**/_legacy/**` directories so archived tests don't run.
+- New top-level README narrative oriented around "payment layer for autonomous AI agents on Celo"
+- `docs/BUILD_LOG.md` capturing the dated decision trail (architecture, demo, ERC-8004 interface notes, Facilitator design rationale, SDK design rationale)
+
+### Changed
+- **Testnet target switched from Celo Alfajores → Celo Sepolia** (chainId `11142220`). The canonical Celo ERC-8004 contracts are deployed on Sepolia; Alfajores is no longer a build target. `hardhat.config.ts` updated accordingly.
+- Top-level + `contracts/` READMEs updated to reflect the lean architecture (one on-chain payment layer + canonical ERC-8004 delegation)
+- **`src/contracts/addresses.ts`** rewritten: `EnvoyContractAddresses` shape is now `{ facilitator, identityRegistry, reputationRegistry }` (was four snowflake fields). Canonical 8004 addresses are baked in for both Celo mainnet (42220) and Celo Sepolia (11142220). New `CELO_MAINNET` / `CELO_SEPOLIA` chain-id constants exported.
+
+### Removed
+- **`EnvoyAgentRegistry.sol`** — superseded by the canonical ERC-8004 Identity Registry on Celo (`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` mainnet, `0x8004A818BFB912233c491871b3d84c89A494BD9e` Sepolia). Source preserved under [`contracts/future/`](contracts/future/).
+- **`EnvoyReputation.sol`** — superseded by the canonical ERC-8004 Reputation Registry (`0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` mainnet, `0x8004B663056A597Dffe9eCcC1965A193B7388713` Sepolia). Source preserved under [`contracts/future/`](contracts/future/).
+- **`EnvoyEscrow.sol`** and **`EnvoyPolicyGuard.sol`** — merged into the new `EnvoyFacilitator.sol`. Source preserved under [`contracts/future/`](contracts/future/). The atomic check + settle model in the new contract removes the two-call race window the old escrow / policy split had.
+- SDK exports `AgentRegistryClient`, `createAgentRegistry`, `ReputationClient`, `createReputation`, `EscrowClient`, `createEscrow`, `PolicyGuardClient`, `createPolicyGuard`, the four `ENVOY_*_ABI` exports, and their types — viem wrappers moved to `src/contracts/_legacy/` pending replacement with a single `EnvoyFacilitator` client + canonical ERC-8004 helpers.
+- `examples/celo-agent-identity.ts` and `examples/celo-escrow.ts` archived to `examples/_legacy/` (both referenced removed contracts).
+
+### Pending (locked, not yet code)
+- **Deploy** `EnvoyFacilitator` to Celo Sepolia, verify on Celoscan, paste the address into `src/contracts/addresses.ts`.
+
+---
+
 ## [0.2.0] — 2026-04-04
 
 ### 🚀 Pay In Infrastructure (NEW)

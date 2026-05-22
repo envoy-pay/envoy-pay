@@ -102,7 +102,7 @@ The interceptor inside `EnvoyClient` does everything between the agent's request
 | Path | When you want this | Entrypoint |
 |---|---|---|
 | **HTTP payments** (x402 / MPP) | Your agent calls third-party APIs that gate access behind 402 challenges | [`EnvoyClient`](src/client.ts) + an adapter (`EvmPaymentAdapter`, `StripePaymentAdapter`, …) |
-| **On-chain commerce** | Agents transact directly with each other or via escrow on Celo | [`createEscrow`](src/contracts/escrow.ts), [`createAgentRegistry`](src/contracts/agent-registry.ts) + the Solidity contracts |
+| **On-chain commerce** | Agents transact directly through the `EnvoyFacilitator` on Celo, with identity backed by canonical ERC-8004 | [`EnvoyFacilitator.sol`](contracts/src/EnvoyFacilitator.sol) + helpers under `src/identity/` |
 
 Most production stacks use both. The SDK exposes them through a single import surface.
 
@@ -121,39 +121,45 @@ Most production stacks use both. The SDK exposes them through a single import su
 | [`UnifiedWallet`](src/wallet/unified-wallet.ts) | Cross-chain wallet abstraction with intent resolution + chain routing |
 | [`FacilitatorService`](src/facilitator/facilitator-service.ts) | Hosted facilitator with fee calculation + receipts |
 | [Watchers](src/monitor/) | EVM, Solana, Stellar payment monitoring |
-| [Contracts](#smart-contracts) | Four Solidity contracts on Celo + viem-based clients |
+| [Contracts](#smart-contracts) | On-chain payment layer on Celo + canonical ERC-8004 integration |
 
 ---
 
 ## Smart contracts
 
-Four contracts ship in [`contracts/`](contracts/) (Hardhat workspace, Solidity 0.8.27, OpenZeppelin 5, evm: cancun):
+Envoy's on-chain layer lives in [`contracts/`](contracts/) (Hardhat workspace, Solidity 0.8.27, OpenZeppelin 5, evm: cancun). It ships **one** payment contract and **delegates identity and reputation to Celo's canonical ERC-8004 registries**.
 
 | Contract | What it does | Source |
 |---|---|---|
-| `EnvoyAgentRegistry` | On-chain DID → owner + metadata. ERC-8004-inspired. | [`EnvoyAgentRegistry.sol`](contracts/src/EnvoyAgentRegistry.sol) |
-| `EnvoyEscrow` | Deposit funds → facilitator signs an EIP-712 release receipt off-chain → anyone submits the signature to unlock. Timeout-based refund built in. | [`EnvoyEscrow.sol`](contracts/src/EnvoyEscrow.sol) |
-| `EnvoyReputation` | Caller-signed reputation attestations per (agent DID, category). One attestation per attester, with average-score helper. | [`EnvoyReputation.sol`](contracts/src/EnvoyReputation.sol) |
-| `EnvoyPolicyGuard` | Trust-minimized daily spending cap. Agent (or session key) calls `checkAndSpend` instead of moving funds directly. | [`EnvoyPolicyGuard.sol`](contracts/src/EnvoyPolicyGuard.sol) |
+| `EnvoyFacilitator` | One `pay()` call consumes an EIP-712 auth from the agent's wallet, validates the signer against canonical ERC-8004 `getAgentWallet(agentId)`, enforces per-(agent, token) rolling-window spending limits, splits the amount into net (→ merchant) and fee (→ treasury), and emits a `Settled` event keyed by `challengeId`. Strict CEI, ERC-1271 fallback for smart-wallet agents, zero internal balance. | [`EnvoyFacilitator.sol`](contracts/src/EnvoyFacilitator.sol) |
+
+### Canonical ERC-8004 (Celo)
+
+| Registry | Mainnet | Sepolia |
+|---|---|---|
+| Identity | `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| Reputation | `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63` | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+
+The SDK calls these directly via thin viem helpers under `src/identity/`. No Envoy-specific identity contract — agents are first-class ERC-8004 NFTs and 8004scan indexes them automatically.
 
 ```bash
 cd contracts
 npm install
 npx hardhat compile
-npx hardhat test    # 23 tests
+npx hardhat test
 ```
 
 Deploy:
 
 ```bash
 cp .env.example .env   # add DEPLOYER_PRIVATE_KEY + CELOSCAN_API_KEY
-npx hardhat run scripts/deploy.ts --network alfajores   # testnet
-npx hardhat run scripts/deploy.ts --network celo        # mainnet
+npx hardhat run scripts/deploy.ts --network celoSepolia  # testnet
+npx hardhat run scripts/deploy.ts --network celo         # mainnet
 ```
 
 After deployment, paste the printed addresses into [`src/contracts/addresses.ts`](src/contracts/addresses.ts) — the SDK's viem clients pick them up automatically.
 
-The SDK side exposes typed clients for each: `createAgentRegistry`, `createEscrow`, `createReputation`, `createPolicyGuard`. See [`examples/celo-escrow.ts`](examples/celo-escrow.ts) for the full deposit → release → refund flow.
+A typed `EnvoyFacilitator` viem client + ERC-8004 helpers ship under `src/identity/` (in progress — see [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md)).
 
 ---
 
@@ -164,7 +170,7 @@ Celo is ranked first in the router scorer (`priorityBoost: -3`). The full list:
 | Chain | Chain ID | Native | Stablecoins | Notes |
 |---|---|---|---|---|
 | **Celo** | 42220 | CELO | cUSD, cEUR, cREAL, USDC, USDT | Default, first-class |
-| Celo Alfajores | 44787 | CELO | cUSD, cEUR, USDC | Testnet |
+| Celo Sepolia | 11142220 | CELO | cUSD, cKES, USDC | Testnet (active — replaces Alfajores) |
 | Base | 8453 | ETH | USDC | |
 | Base Sepolia | 84532 | ETH | USDC | Testnet |
 | Arbitrum | 42161 | ETH | USDC | |
@@ -195,8 +201,6 @@ The `EnvoyClient` interceptor auto-detects which one the server is using on ever
 | File | Demonstrates |
 |---|---|
 | [`celo-quickstart.ts`](examples/celo-quickstart.ts) | Minimal Celo + cUSD payment |
-| [`celo-escrow.ts`](examples/celo-escrow.ts) | Deposit → facilitator-signed EIP-712 release |
-| [`celo-agent-identity.ts`](examples/celo-agent-identity.ts) | Register an agent DID on `EnvoyAgentRegistry` |
 | [`ows-demo.ts`](examples/ows-demo.ts) | Open Wallet Standard integration |
 | [`xlayer-uniswap-agent.ts`](examples/xlayer-uniswap-agent.ts) | DEX-routed payments via OnchainOS |
 

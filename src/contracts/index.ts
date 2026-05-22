@@ -1,36 +1,29 @@
-// envoy on-chain layer — Celo Solidity contracts (registry, escrow, reputation, policy guard)
-
-export {
-  AgentRegistryClient,
-  createAgentRegistry,
-} from './agent-registry';
-export type { AgentRecord, AgentRegistryOptions } from './agent-registry';
-
-export {
-  EscrowClient,
-  createEscrow,
-} from './escrow';
-export type { DepositRecord, EscrowOptions, ReleaseSignaturePayload } from './escrow';
-
-export {
-  ReputationClient,
-  createReputation,
-} from './reputation';
-export type { OnChainAttestation, ReputationOptions } from './reputation';
-
-export {
-  PolicyGuardClient,
-  createPolicyGuard,
-} from './policy-guard';
-export type { PolicyState, PolicyGuardOptions } from './policy-guard';
+// envoy on-chain layer — the EnvoyFacilitator contract on Celo.
+//
+// Identity and reputation are delegated to the canonical ERC-8004 registries
+// on Celo; helpers for those live under `src/identity/erc8004/`.
 
 export {
   ENVOY_CONTRACT_ADDRESSES,
   getEnvoyAddresses,
+  CELO_MAINNET,
+  CELO_SEPOLIA,
 } from './addresses';
 export type { EnvoyContractAddresses } from './addresses';
 
-export { ENVOY_AGENT_REGISTRY_ABI } from './abis/EnvoyAgentRegistry';
-export { ENVOY_ESCROW_ABI } from './abis/EnvoyEscrow';
-export { ENVOY_REPUTATION_ABI } from './abis/EnvoyReputation';
-export { ENVOY_POLICY_GUARD_ABI } from './abis/EnvoyPolicyGuard';
+export {
+  createEnvoyFacilitator,
+  signPaymentAuth,
+  paymentAuthDomain,
+  paymentAuthTypedData,
+  PAYMENT_AUTH_TYPES,
+} from './facilitator';
+export type {
+  PaymentAuth,
+  LimitView,
+  SettledEvent,
+  EnvoyFacilitatorClient,
+  EnvoyFacilitatorClientOptions,
+} from './facilitator';
+
+export { ENVOY_FACILITATOR_ABI } from './abis/EnvoyFacilitator';
