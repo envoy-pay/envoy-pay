@@ -25,7 +25,7 @@ export const CELO_SEPOLIA = 11142220 as const;
 
 export const ENVOY_CONTRACT_ADDRESSES: Record<number, EnvoyContractAddresses> = {
   [CELO_MAINNET]: {
-    facilitator: ZERO,
+    facilitator: '0xE268B6fE16319b49D22562C93c0d2395F65FCAcC',
     identityRegistry: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
     reputationRegistry: '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63',
   },
