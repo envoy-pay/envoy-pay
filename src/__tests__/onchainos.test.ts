@@ -33,14 +33,18 @@ describe('OnchainOSProvider', () => {
   });
 
   describe('healthCheck', () => {
-    it('should return ok: false when API is unreachable with invalid credentials', async () => {
+    it('returns ok: false (graceful) when the upstream call fails', async () => {
       const provider = new OnchainOSProvider(MOCK_CONFIG);
+      // Hermetic: force the upstream call to fail fast rather than hitting the
+      // live OKX endpoint (which hangs past the test timeout). Exercises the
+      // healthCheck() catch path deterministically. Live coverage lives in the
+      // separately-gated "OnchainOS Live Integration" suite below.
+      const spy = vi
+        .spyOn(provider, 'getSupportedChains')
+        .mockRejectedValue(new Error('network unreachable'));
       const health = await provider.healthCheck();
-      // With invalid credentials, it should fail gracefully
-      expect(health).toHaveProperty('ok');
-      expect(typeof health.ok).toBe('boolean');
-      expect(health).toHaveProperty('chains');
-      expect(health).toHaveProperty('xlayer');
+      expect(health).toEqual({ ok: false, chains: 0, xlayer: false });
+      spy.mockRestore();
     });
   });
 

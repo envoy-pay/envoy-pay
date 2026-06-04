@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:esm": "tsc -p tsconfig.esm.json && node scripts/fix-esm-extensions.mjs",
     "build:types": "tsc -p tsconfig.types.json",
     "build": "rm -rf dist && npm run build:cjs && npm run build:esm && npm run build:types",
     "test": "vitest run",
@@ -76,15 +76,15 @@
   "engines": {
     "node": ">=18"
   },
-  "author": "envoy <team@envoy.dev>",
+  "author": "Envoy",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/envoy-dev/envoy"
+    "url": "git+https://github.com/JemIIahh/envoy.git"
   },
-  "homepage": "https://envoy.dev",
+  "homepage": "https://github.com/JemIIahh/envoy#readme",
   "bugs": {
-    "url": "https://github.com/envoy-dev/envoy/issues"
+    "url": "https://github.com/JemIIahh/envoy/issues"
   },
   "dependencies": {
     "@open-wallet-standard/core": "^1.2.4",

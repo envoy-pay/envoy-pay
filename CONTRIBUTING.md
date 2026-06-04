@@ -7,8 +7,8 @@ Thank you for your interest in contributing to envoy! This document provides gui
 1. **Fork** the repository
 2. **Clone** your fork:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/envoy-dev-envoy.git
-   cd envoy-dev-envoy
+   git clone https://github.com/YOUR_USERNAME/envoy.git
+   cd envoy
    ```
 3. **Install** dependencies:
    ```bash
@@ -73,7 +73,7 @@ All new features must include tests. We target 100% coverage on critical paths (
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/envoy-dev/envoy/issues) for bugs and feature requests
+- Use [GitHub Issues](https://github.com/JemIIahh/envoy/issues) for bugs and feature requests
 - For security vulnerabilities, see [SECURITY.md](SECURITY.md)
 - Include reproduction steps, expected vs actual behavior, and Node.js version
 
