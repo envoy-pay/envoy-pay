@@ -19,7 +19,7 @@
  * );
  * ```
  */
-export { createX402Gate, type X402GateConfig } from './x402-gate';
+export { createX402Gate, type X402GateConfig, type X402Proof } from './x402-gate';
 export { createMppGate, type MppGateConfig } from './mpp-gate';
 export { createPaymentGate, type PaymentGateConfig } from './payment-gate';
 export { createWebhookHandler, type WebhookConfig } from './webhook';
