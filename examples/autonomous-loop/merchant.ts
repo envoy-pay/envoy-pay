@@ -29,14 +29,15 @@ import {
 } from 'viem';
 import { celo, celoSepolia } from 'viem/chains';
 import {
-  createX402Gate,
   getEnvoyAddresses,
   erc8004,
   ENVOY_FACILITATOR_ABI,
   CELO_MAINNET,
-  type X402Proof,
 } from '../../src';
+import { createX402Gate, type X402Proof } from '../../src/server';
 import { CUSD } from './facilitator-adapter';
+import type { SelfAgentVerifier } from '@selfxyz/agent-sdk';
+import { verifyHumanProof } from './self-identity';
 
 const CUSD_DECIMALS = 18;
 
@@ -51,6 +52,13 @@ export interface MerchantOptions {
   chainId?: number;
   /** Optional custom RPC. */
   rpcUrl?: string;
+  /**
+   * Optional Self Agent ID verifier. When set, the merchant requires every
+   * request to carry a valid `x-self-agent-*` signature from an agent that a
+   * real human registered on Self's Celo registry — proof-of-human, checked
+   * BEFORE payment. Build one with `createHumanProofVerifier` (self-identity.ts).
+   */
+  humanProofVerifier?: SelfAgentVerifier;
   /** Optional logger. */
   logger?: (msg: string) => void;
 }
@@ -135,11 +143,46 @@ export function startMerchant(opts: MerchantOptions): Promise<RunningMerchant> {
     },
   });
 
+  const verifier = opts.humanProofVerifier;
+
   const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url && req.url.startsWith('/premium')) {
-      // Drain the request body (the gate only needs headers) then run the gate.
-      req.on('data', () => {});
-      req.on('end', () => {
+      // Capture the body — the payment gate only needs headers, but the Self
+      // signature covers the body, so the verifier needs the exact bytes.
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', async () => {
+        const body = Buffer.concat(chunks).toString('utf-8');
+
+        // ── Proof-of-human gate (Self Agent ID) — runs BEFORE payment ──────
+        // No point charging an agent no human stands behind.
+        if (verifier) {
+          try {
+            const proof = await verifyHumanProof(verifier, {
+              method: req.method!,
+              url: req.url!,
+              body,
+              headers: req.headers as Record<string, string | string[] | undefined>,
+            });
+            if (!proof.valid) {
+              log(`[merchant] ✗ proof-of-human rejected — ${proof.error ?? 'no valid Self Agent ID'}`);
+              return endJson(res, 401, {
+                error: 'proof-of-human required',
+                detail: proof.error ?? 'request not signed by a Self-verified, human-backed agent',
+                hint: 'register the agent with `npm run register:self`, then sign requests with its Self key',
+              });
+            }
+            log(
+              `[merchant] ✓ human-backed · Self Agent #${proof.agentId} · signer ${proof.agentAddress}` +
+                (proof.credentials?.ofac ? ` · OFAC ${proof.credentials.ofac.every(Boolean) ? '✓' : '✗'}` : ''),
+            );
+          } catch (err: any) {
+            log(`[merchant] ✗ proof-of-human check errored — ${err?.shortMessage ?? err?.message ?? err}`);
+            return endJson(res, 401, { error: 'proof-of-human verification failed' });
+          }
+        }
+
+        // ── Payment gate (x402 → on-chain Settled + capability) ────────────
         gate(req as any, res, () => serveResource(res));
       });
       req.on('error', () => endJson(res, 400, { error: 'bad request' }));
@@ -152,7 +195,10 @@ export function startMerchant(opts: MerchantOptions): Promise<RunningMerchant> {
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address();
       const port = typeof addr === 'object' && addr ? addr.port : 0;
-      log(`[merchant] listening on http://127.0.0.1:${port} · price ${formatUnits(opts.amount, CUSD_DECIMALS)} cUSD · needs "${opts.requiredCapability}"`);
+      log(
+        `[merchant] listening on http://127.0.0.1:${port} · price ${formatUnits(opts.amount, CUSD_DECIMALS)} cUSD · ` +
+          `needs "${opts.requiredCapability}"${verifier ? ' · proof-of-human required (Self Agent ID)' : ''}`,
+      );
       resolve({
         url: `http://127.0.0.1:${port}`,
         port,

@@ -95,6 +95,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "demo": "ts-node --transpile-only examples/autonomous-loop/demo.ts",
+    "register:self": "ts-node --transpile-only examples/autonomous-loop/register-self.ts",
     "contracts:compile": "cd contracts && npx hardhat compile",
     "contracts:test": "cd contracts && npx hardhat test",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
@@ -180,6 +181,7 @@
     }
   },
   "devDependencies": {
+    "@selfxyz/agent-sdk": "^0.2.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "@stellar/stellar-sdk": "^13.3.0",

@@ -16,7 +16,9 @@ ever driven by hand. This example supplies the missing bridge and closes the loo
 | File | Role |
 |---|---|
 | `facilitator-adapter.ts` | **The bridge.** A `PaymentAdapter` whose `pay()` signs an EIP-712 `PaymentAuth` and settles through `EnvoyFacilitator.pay()`, returning the on-chain `Settled` tx hash. Drops straight into the stock `EnvoyClient`. |
-| `merchant.ts` | A 402-gated service (`createX402Gate`) that **verifies the settlement on-chain** — decodes the `Settled` event, checks merchant/amount/token, replay-guards it — and **requires the paying agent's ERC-8004 card to declare a capability** before serving. |
+| `merchant.ts` | A 402-gated service (`createX402Gate`) that **verifies the settlement on-chain** — decodes the `Settled` event, checks merchant/amount/token, replay-guards it — **requires the paying agent's ERC-8004 card to declare a capability**, and (optionally) **requires proof-of-human via Self Agent ID** before serving. |
+| `self-identity.ts` | **Proof-of-human glue.** Builds the Self `SelfAgentVerifier` (service side), verifies a request's `x-self-agent-*` signature, and attaches an Axios interceptor that makes the agent sign every request with its Self key. Keeps `@selfxyz/agent-sdk` out of the published SDK. |
+| `register-self.ts` | One-time: mint a **Self Agent ID** (soulbound ERC-721 bound to the owner's passport ZK-proof). This is the id the hackathon asks for in the submission tweet. `npm run register:self` |
 | `demo.ts` | One command: preflight + narrate the loop (zero spend), then on `CONFIRM=send` run the real `EnvoyClient` agent against the in-process merchant and print the Celoscan receipt. |
 
 ## The agent is just this
@@ -66,6 +68,43 @@ page — it reveals the signing key once):
 The preflight checks every one of these and tells you exactly what's missing
 before anything is broadcast.
 
+## Proof-of-human (Self Agent ID) — optional, off by default
+
+The on-chain checks prove a payment *settled* and that the agent *declares* a
+capability. They can't prove there's a real, sanctions-clean **human** behind the
+agent. [Self Agent ID](https://docs.self.xyz/self-agent-id/overview) — a
+Proof-of-Human extension of ERC-8004 — closes that gap: the owner scans a passport
+once (ZK, nothing leaves the phone) and a soulbound NFT on Celo binds the agent's
+key to that human proof. The agent then signs every HTTP request with the **same
+secp256k1 key** it uses for payments, and the merchant refuses to serve an agent no
+human stands behind.
+
+**1. Get a Self Agent ID** (the id that goes in your submission tweet):
+
+```bash
+# testnet (mock passport in the Self app)
+HUMAN_ADDRESS=0xYourOwnerWallet CHAIN=sepolia npm run register:self
+# mainnet (real passport)
+HUMAN_ADDRESS=0xYourOwnerWallet npm run register:self
+```
+
+It prints a deep link to scan in the Self app, then your **Self Agent ID** and the
+agent key. Use that key as `AGENT_PRIVATE_KEY` (and bind the same address at
+`/create`) so one identity is provable in both registries — canonical ERC-8004 and
+Self's.
+
+**2. Run the loop with proof-of-human enforced:**
+
+```bash
+REQUIRE_HUMAN_PROOF=1 REQUIRE_OFAC=1 CONFIRM=send \
+  AGENT_ID=<id> AGENT_PRIVATE_KEY=0x… npm run demo
+```
+
+The merchant now gates on **paid on-chain + declares capability + human-backed** —
+the full trust triangle. Note Self Agent ID lives in a **separate** registry from
+the canonical ERC-8004 one Envoy mints into; they share the agent key but live at
+different addresses on Celo.
+
 ## Optional env
 
 | Var | Default | Meaning |
@@ -75,3 +114,6 @@ before anything is broadcast.
 | `CAPABILITY` | `x402-payments` | capability the merchant requires |
 | `CHAIN` | mainnet | set `sepolia` for testnet (note: facilitator is Mainnet-only) |
 | `RPC_URL` | viem default | custom Celo RPC |
+| `REQUIRE_HUMAN_PROOF` | off | `1` to require a Self Agent ID proof-of-human on every request |
+| `REQUIRE_OFAC` | off | `1` to also require the human passed OFAC screening |
+| `MIN_AGE` | off | `18` or `21` to require the human's verified age |

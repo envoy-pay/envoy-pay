@@ -39,6 +39,12 @@ import { celo, celoSepolia } from 'viem/chains';
 import { EnvoyClient, CELO_MAINNET, CELO_SEPOLIA } from '../../src';
 import { FacilitatorAdapter } from './facilitator-adapter';
 import { startMerchant } from './merchant';
+import { SelfAgent, type AgentInfo } from '@selfxyz/agent-sdk';
+import {
+  createHumanProofVerifier,
+  attachHumanProofSigning,
+  networkForChain,
+} from './self-identity';
 
 const DECIMALS = 18;
 const fmt = (v: bigint) => formatUnits(v, DECIMALS);
@@ -64,6 +70,16 @@ async function main() {
   const confirm = process.env.CONFIRM === 'send';
   const explorer = chainId === CELO_MAINNET ? 'https://celoscan.io' : 'https://celo-sepolia.blockscout.com';
 
+  // ── Self Agent ID — optional proof-of-human layer (off by default) ──────────
+  const requireHumanProof = process.env.REQUIRE_HUMAN_PROOF === '1' || process.env.REQUIRE_HUMAN_PROOF === 'true';
+  const selfNetwork = networkForChain(chainId);
+  const selfRequireOFAC = process.env.REQUIRE_OFAC === '1' || process.env.REQUIRE_OFAC === 'true';
+  const selfMinAge = process.env.MIN_AGE ? Number(process.env.MIN_AGE) : undefined;
+  // The agent's Envoy signing key IS its Self key — one identity, both registries.
+  const selfAgent = requireHumanProof
+    ? new SelfAgent({ privateKey: pk!, network: selfNetwork, ...(rpcUrl ? { rpcUrl } : {}) })
+    : null;
+
   const adapter = new FacilitatorAdapter({ agentId, privateKey: pk!, chainId, rpcUrl, logger: log });
   const agentWallet = adapter.getAddress() as Address;
   const merchant = getAddress((process.env.MERCHANT as Hex) ?? agentWallet);
@@ -74,6 +90,10 @@ async function main() {
   log(`  agent:      #${agentId}  ·  signing wallet ${agentWallet}`);
   log(`  merchant:   ${merchant}${selfPay ? '  (self — only the fee leaves you)' : ''}`);
   log(`  price:      ${fmt(amount)} cUSD  ·  resource needs capability "${requiredCapability}"`);
+  if (requireHumanProof) {
+    log(`  identity:   proof-of-human REQUIRED · Self Agent ID (${selfNetwork})` +
+      `${selfRequireOFAC ? ' · OFAC' : ''}${selfMinAge ? ` · age≥${selfMinAge}` : ''}`);
+  }
   log(`  mode:       ${confirm ? 'LIVE — will broadcast a real settlement' : 'DRY-RUN — reads only (set CONFIRM=send to execute)'}`);
 
   // ── Preflight — everything the loop needs, checked before any spend ─────────
@@ -108,8 +128,28 @@ async function main() {
   check(capOk, `card declares "${requiredCapability}"`,
     caps.length ? `card lists: ${caps.join(', ')}${capOk ? '' : ' — merchant will reject; add it to the agent card'}` : 'card lists no capabilities — merchant will reject');
 
+  // Proof-of-human: is this signing key registered + verified on Self's registry?
+  let selfInfo: AgentInfo | null = null;
+  let humanOk = true;
+  if (selfAgent) {
+    try {
+      selfInfo = await selfAgent.getInfo();
+    } catch {
+      selfInfo = null;
+    }
+    humanOk = !!selfInfo?.isVerified && selfInfo.isProofFresh;
+    check(humanOk, `agent is human-backed (Self Agent ID)`,
+      selfInfo?.isVerified
+        ? `Self Agent #${selfInfo.agentId}${selfInfo.isProofFresh ? ` · proof valid` : ' · proof STALE — refresh it'}`
+        : 'this key has no Self Agent ID — run `npm run register:self` (owner scans a passport once)');
+  }
+
   // ── How the loop will run (always shown — this is the teaching moment) ──────
   banner('the loop');
+  if (requireHumanProof) {
+    log('  0. agent  → signs every request with its Self key                  (proof-of-human)');
+    log('     server → recovers the signer, checks Self\'s Celo registry      (human-backed? OFAC?)');
+  }
   log('  1. agent  → POST /premium/market-report           (no payment yet)');
   log('  2. server → 402 Payment Required                   (x402 challenge, asks cUSD on Celo)');
   log('  3. agent  → EnvoyClient intercepts the 402, checks its budget policy');
@@ -120,7 +160,7 @@ async function main() {
 
   if (!confirm) {
     banner('dry-run complete');
-    if (walletOk && hasFunds && hasGas && capOk) {
+    if (walletOk && hasFunds && hasGas && capOk && humanOk) {
       log('  ✓ Ready. Re-run with CONFIRM=send to execute the real (sub-cent) loop:');
       log(`      CONFIRM=send AGENT_ID=${agentId} AGENT_PRIVATE_KEY=0x… npx ts-node --transpile-only examples/autonomous-loop/demo.ts`);
     } else {
@@ -134,6 +174,7 @@ async function main() {
   if (!hasFunds) fail(`Agent has ${cusd} cUSD but needs ≥ ${fmt(amount)} — fund it at /fund/${agentId}.`);
   if (!hasGas) fail('Agent wallet has no CELO for gas — send it a little CELO.');
   if (!capOk) fail(`Agent #${agentId}'s card doesn't declare "${requiredCapability}" — the merchant will reject it.`);
+  if (requireHumanProof && !humanOk) fail('REQUIRE_HUMAN_PROOF is set but this key has no fresh Self Agent ID — run `npm run register:self` first.');
 
   // Owner sets the policy if it's missing/too low (the agent can't raise its own cap).
   if (!limitOk) {
@@ -153,6 +194,9 @@ async function main() {
     chainId,
     rpcUrl,
     logger: log,
+    humanProofVerifier: requireHumanProof
+      ? createHumanProofVerifier({ chainId, requireOFAC: selfRequireOFAC, minimumAge: selfMinAge, rpcUrl })
+      : undefined,
   });
 
   try {
@@ -163,6 +207,9 @@ async function main() {
       adapter,
       logger: log,
     });
+
+    // Sign every outbound request with the agent's Self key (proof-of-human).
+    if (selfAgent) attachHumanProofSigning(agent.api, selfAgent);
 
     log('');
     const data = await agent.performTask('/premium/market-report', { ask: 'CELO/USD 24h' });

@@ -286,7 +286,7 @@ npx hardhat run scripts/deploy.ts --network celo   # mainnet (celoSepolia for te
 | **Identity** | Canonical ERC-8004 NFTs, [8004scan](https://8004scan.io)-indexed |
 | **Demo** | [`examples/autonomous-loop/`](examples/autonomous-loop/) — `npm run demo` |
 
-The **autonomous loop** is envoy's whole thesis, runnable in one command: an `EnvoyClient` agent hits a 402-gated API, settles through `EnvoyFacilitator` with an EIP-712 auth, retries, and gets the data — while the merchant verifies the on-chain `Settled` event *and* the agent's ERC-8004 capability before serving. **No human co-signs a single step.** It ships with a zero-spend dry run; see its [walkthrough](examples/autonomous-loop/README.md).
+The **autonomous loop** is envoy's whole thesis, runnable in one command: an `EnvoyClient` agent hits a 402-gated API, settles through `EnvoyFacilitator` with an EIP-712 auth, retries, and gets the data — while the merchant verifies the on-chain `Settled` event, the agent's ERC-8004 capability, and (optionally) a **Self Agent ID proof-of-human** before serving. **No human co-signs a single step.** It ships with a zero-spend dry run; see its [walkthrough](examples/autonomous-loop/README.md).
 
 ---
 
