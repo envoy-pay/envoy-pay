@@ -31,3 +31,8 @@ export type {
 // Canonical Celo ERC-8004 helpers — Identity + Reputation registries.
 export * as erc8004 from './erc8004';
 export type { AgentId, CanonicalAgent, MetadataEntry, FeedbackArgs } from './erc8004';
+
+// Direct re-export of the AgentWalletSet EIP-712 builder. Consumers that vendor a
+// client-safe copy (e.g. the envoy-app web client, which can't bundle the native
+// OWS dep) pin their copy against this to guarantee on-chain signatures match.
+export { agentWalletRotationTypedData } from './erc8004/identity';
