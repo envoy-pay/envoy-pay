@@ -14,6 +14,9 @@ jobs:
     name: SDK — Test & Build
     runs-on: ubuntu-latest
     strategy:
+      # Don't cancel the other Node versions when one fails — we want to see
+      # every version's result, not just the first to trip.
+      fail-fast: false
       matrix:
         node-version: [18, 20, 22]
 
