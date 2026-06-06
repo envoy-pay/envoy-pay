@@ -33,8 +33,8 @@ This release is the Celo-first re-imagining of the SDK with a real on-chain laye
 - SDK exports `AgentRegistryClient`, `createAgentRegistry`, `ReputationClient`, `createReputation`, `EscrowClient`, `createEscrow`, `PolicyGuardClient`, `createPolicyGuard`, the four `ENVOY_*_ABI` exports, and their types — viem wrappers moved to `src/contracts/_legacy/` pending replacement with a single `EnvoyFacilitator` client + canonical ERC-8004 helpers.
 - `examples/celo-agent-identity.ts` and `examples/celo-escrow.ts` archived to `examples/_legacy/` (both referenced removed contracts).
 
-### Pending (locked, not yet code)
-- **Deploy** `EnvoyFacilitator` to Celo Sepolia, verify on Celoscan, paste the address into `src/contracts/addresses.ts`.
+### Deployed
+- **`EnvoyFacilitator` is live on Celo mainnet** (chainId `42220`) at [`0xE268B6fE16319b49D22562C93c0d2395F65FCAcC`](https://celoscan.io/address/0xE268B6fE16319b49D22562C93c0d2395F65FCAcC), wired into `src/contracts/addresses.ts` alongside the canonical ERC-8004 Identity/Reputation registries.
 
 ---
 
