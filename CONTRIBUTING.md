@@ -73,7 +73,7 @@ All new features must include tests. We target 100% coverage on critical paths (
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/JemIIahh/envoy/issues) for bugs and feature requests
+- Use [GitHub Issues](https://github.com/envoy-pay/envoy-pay/issues) for bugs and feature requests
 - For security vulnerabilities, see [SECURITY.md](SECURITY.md)
 - Include reproduction steps, expected vs actual behavior, and Node.js version
 

@@ -128,7 +128,7 @@ The repo is two workspaces: the SDK at the root (`src/`) and the contracts (`con
 
 ```bash
 # 1. Clone + install
-git clone https://github.com/JemIIahh/envoy.git
+git clone https://github.com/envoy-pay/envoy-pay.git
 cd envoy
 npm install                          # root SDK deps (viem, vitest, …)
 

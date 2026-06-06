@@ -1,5 +1,5 @@
 // envoy — Celo-first agent payment SDK (x402 + MPP)
-// https://github.com/JemIIahh/envoy
+// https://github.com/envoy-pay/envoy-pay
 //
 // The default import is the lean Celo core: the agent client, on-chain
 // settlement via the EnvoyFacilitator, ERC-8004 identity, an EVM payment

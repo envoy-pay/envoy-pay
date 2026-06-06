@@ -148,11 +148,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JemIIahh/envoy.git"
+    "url": "git+https://github.com/envoy-pay/envoy-pay.git"
   },
-  "homepage": "https://github.com/JemIIahh/envoy#readme",
+  "homepage": "https://github.com/envoy-pay/envoy-pay#readme",
   "bugs": {
-    "url": "https://github.com/JemIIahh/envoy/issues"
+    "url": "https://github.com/envoy-pay/envoy-pay/issues"
   },
   "dependencies": {
     "@open-wallet-standard/core": "^1.2.4",
