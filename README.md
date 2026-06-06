@@ -65,7 +65,7 @@ AI agents are the new workforce, but payments are built for humans. An agent can
 npm install envoy-pay viem
 ```
 
-Node 18+. Tree-shakable ESM + CJS dual build. Every non-Celo rail (Stripe, Solana, Stellar) is an **optional peer dependency**, pulled in only when you import its subpath.
+Node 20+. Tree-shakable ESM + CJS dual build. Every non-Celo rail (Stripe, Solana, Stellar) is an **optional peer dependency**, pulled in only when you import its subpath.
 
 ### Make an agent pay for an API — Celo + cUSD
 
@@ -477,7 +477,7 @@ npm run contracts:test            # hardhat test (23 specs)
 | `solana` · `stellar` · `chain-router` · `agent-card` · `did-resolver` … | 15–18 each | Non-EVM rails, routing, ERC-8004 identity |
 | _… 35 suites total_ | **499 passing** (+9 integration tests skipped without creds) | + server gates, watchers, webhooks, contracts client |
 
-CI runs the SDK and the Hardhat contracts on every push (Node 18/20/22) — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+CI runs the SDK and the Hardhat contracts on every push (Node 20/22) — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 

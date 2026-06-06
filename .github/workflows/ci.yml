@@ -18,7 +18,9 @@ jobs:
       # every version's result, not just the first to trip.
       fail-fast: false
       matrix:
-        node-version: [18, 20, 22]
+        # Node 18 is EOL (Apr 2025) and can't run the Solana rail — its
+        # rpc-websockets→uuid dep is ESM-only and breaks `require()` there.
+        node-version: [20, 22]
 
     steps:
       - name: Checkout
