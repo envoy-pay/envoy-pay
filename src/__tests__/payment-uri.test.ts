@@ -13,13 +13,24 @@ describe('buildEip681Uri', () => {
     expect(uri).toContain('value=1500000000000000000');
   });
 
-  it('builds native ETH URI with chain ID', () => {
+  it('puts chain ID in the EIP-681 path (@chainId), not a query param', () => {
     const uri = buildEip681Uri({ to: '0xABC', amount: '0.01', chainId: 8453 });
-    expect(uri).toContain('chainId=8453');
+    expect(uri).toContain('ethereum:0xABC@8453');
+    // A `?chainId=` query param is non-standard — wallets ignore it and default
+    // to Ethereum mainnet, sending funds on the wrong chain.
+    expect(uri).not.toContain('chainId=');
   });
 
-  it('omits chainId for mainnet', () => {
+  it('puts chain ID before /transfer for ERC-20 (Celo cUSD)', () => {
+    const uri = buildEip681Uri({
+      to: '0xRECIP', amount: '1', asset: '0xCUSD', chainId: 42220, decimals: 18,
+    });
+    expect(uri).toBe('ethereum:0xCUSD@42220/transfer?address=0xRECIP&uint256=1000000000000000000');
+  });
+
+  it('omits the @chainId suffix for mainnet', () => {
     const uri = buildEip681Uri({ to: '0xABC', amount: '1', chainId: 1 });
+    expect(uri).not.toContain('@');
     expect(uri).not.toContain('chainId');
   });
 

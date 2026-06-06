@@ -53,24 +53,29 @@ export function buildEip681Uri(options: Eip681Options): string {
   const { to, amount, asset, chainId, decimals } = options;
   const isNative = !asset || asset === 'ETH' || asset === 'eth';
 
+  // EIP-681 carries the chain id in the PATH as `@<chainId>` (right after the
+  // target address) — NOT as a query param. A non-standard `?chainId=` is
+  // silently ignored by wallets, which then default to Ethereum mainnet and
+  // prompt to send on the WRONG chain. The `@<chainId>` form is what makes a
+  // Celo (42220) QR actually open as a Celo payment.
+  const chainSuffix = chainId && chainId !== 1 ? `@${chainId}` : '';
+
   if (isNative) {
-    // Native ETH: ethereum:<address>?value=<wei>
+    // Native: ethereum:<address>[@<chainId>]?value=<wei>
     const d = decimals ?? 18;
     const weiAmount = toAtomicUnits(amount, d);
     const params = new URLSearchParams();
     params.set('value', weiAmount);
-    if (chainId && chainId !== 1) params.set('chainId', chainId.toString());
-    return `ethereum:${to}?${params.toString()}`;
+    return `ethereum:${to}${chainSuffix}?${params.toString()}`;
   }
 
-  // ERC-20: ethereum:<token_contract>/transfer?address=<recipient>&uint256=<amount>
+  // ERC-20: ethereum:<token>[@<chainId>]/transfer?address=<recipient>&uint256=<amount>
   const d = decimals ?? 6;
   const atomicAmount = toAtomicUnits(amount, d);
   const params = new URLSearchParams();
   params.set('address', to);
   params.set('uint256', atomicAmount);
-  if (chainId && chainId !== 1) params.set('chainId', chainId.toString());
-  return `ethereum:${asset}/transfer?${params.toString()}`;
+  return `ethereum:${asset}${chainSuffix}/transfer?${params.toString()}`;
 }
 
 /**

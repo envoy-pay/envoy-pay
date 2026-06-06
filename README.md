@@ -19,7 +19,7 @@ envoy is **two things shipped as one**:
 | | What it does |
 |---|---|
 | **TypeScript SDK** (`envoy-pay`) | An agent makes an HTTP request → the server returns `402 Payment Required` → envoy detects the protocol (x402 or MPP), checks the agent's spending policy, settles on-chain in cUSD/USDC, and retries the request — all without human intervention. |
-| **Solidity contracts** on Celo | An on-chain layer for trust-minimized agent commerce: identity registry (ERC-8004-inspired), escrow with EIP-712 facilitator receipts, reputation attestations, and per-token spending caps. |
+| **Solidity contracts** on Celo | A minimal on-chain layer for trust-minimized agent commerce: one `EnvoyFacilitator` that settles EIP-712-authorized payments with per-(agent, token) spending caps, net/fee splitting, and `Settled` receipts — identity and reputation delegated to Celo's canonical ERC-8004 registries. |
 
 Celo is the first-class chain (sub-cent fees, ~5s finality, native stablecoins). 12 other EVM chains plus Solana, Stellar, and Stripe MPP are supported too.
 
@@ -63,6 +63,30 @@ const result = await agent.performTask('/premium-data', { prompt: '...' });
 ```
 
 That's the whole story for HTTP-driven payments. For on-chain commerce, jump to [Smart contracts](#smart-contracts).
+
+---
+
+## Import surface
+
+The default `envoy-pay` import is a **lean Celo core**: the agent client, on-chain
+settlement via `EnvoyFacilitator`, ERC-8004 identity, an EVM adapter + watcher, and
+EIP-681 request URIs. Every other rail and capability is **opt-in via a subpath
+import** — so your bundle only carries what you actually use, and adding a rail never
+means giving one up:
+
+```ts
+import { EnvoyClient, EvmPaymentAdapter } from 'envoy-pay';   // Celo + 11 EVM chains
+import { StripePaymentAdapter } from 'envoy-pay/stripe';      // fiat + stablecoin MPP
+import { SolanaPaymentAdapter } from 'envoy-pay/solana';      // Solana rail
+import { StellarPaymentAdapter } from 'envoy-pay/stellar';    // Stellar rail
+import { UnifiedWallet } from 'envoy-pay/wallet';             // cross-chain wallet
+import { createX402Gate } from 'envoy-pay/server';            // run your own 402-gated API
+```
+
+The heavy rail SDKs — `stripe`, `@solana/web3.js`, `@stellar/stellar-sdk` — are
+**optional peer dependencies**: declared, never bundled. A Celo-only agent installs
+nothing extra; importing `envoy-pay/stripe` (or `/solana`, `/stellar`) is what pulls
+the corresponding SDK in. The full subpath list is in [What's in the box](#whats-in-the-box).
 
 ---
 
@@ -110,18 +134,20 @@ Most production stacks use both. The SDK exposes them through a single import su
 
 ## What's in the box
 
-| Module | Purpose |
-|---|---|
-| [`EnvoyClient`](src/client.ts) | Axios-based HTTP client with auto-handling of `402 Payment Required` (x402 + MPP) |
-| [`EvmPaymentAdapter`](src/adapters/evm.ts) | One adapter for Celo + 11 other EVM chains. Native token + every stablecoin (cUSD, cEUR, cREAL, USDC, USDT) |
-| [`StripePaymentAdapter`](src/adapters/stripe.ts) | MPP via Stripe Shared Payment Tokens (fiat + stablecoins) |
-| [`SolanaPaymentAdapter`](src/adapters/solana.ts), [`StellarPaymentAdapter`](src/adapters/stellar.ts) | Non-EVM settlement |
-| [`PolicyEngine`](src/policy.ts) | Monthly budgets, per-tx caps, allow / deny lists |
-| [`AgentIdentity`](src/identity/agent-identity.ts) | W3C DID + ERC-8004-inspired agent identity (optionally backed by the on-chain registry) |
-| [`UnifiedWallet`](src/wallet/unified-wallet.ts) | Cross-chain wallet abstraction with intent resolution + chain routing |
-| [`FacilitatorService`](src/facilitator/facilitator-service.ts) | Hosted facilitator with fee calculation + receipts |
-| [Watchers](src/monitor/) | EVM, Solana, Stellar payment monitoring |
-| [Contracts](#smart-contracts) | On-chain payment layer on Celo + canonical ERC-8004 integration |
+| Module | Import | Purpose |
+|---|---|---|
+| [`EnvoyClient`](src/client.ts) | `envoy-pay` | Axios-based HTTP client, auto-handles `402 Payment Required` (x402 + MPP) |
+| [`EvmPaymentAdapter`](src/adapters/evm.ts) | `envoy-pay` | One adapter for Celo + 11 other EVM chains. Native token + every stablecoin (cUSD, cEUR, cREAL, USDC, USDT) |
+| [`PolicyEngine`](src/policy.ts) | `envoy-pay` | Monthly budgets, per-tx caps, allow / deny lists |
+| [`AgentIdentity`](src/identity/agent-identity.ts) | `envoy-pay` · `/identity` | W3C DID + ERC-8004 agent identity (optionally backed by the on-chain registry) |
+| [`EnvoyFacilitator` client](src/contracts/facilitator.ts) | `envoy-pay` · `/contracts` | Typed viem client — sign an EIP-712 `PaymentAuth`, call `pay()`, read limits, decode `Settled` |
+| [`StripePaymentAdapter`](src/adapters/stripe.ts) | `envoy-pay/stripe` | MPP via Stripe Shared Payment Tokens (fiat + stablecoins) |
+| [`SolanaPaymentAdapter`](src/adapters/solana.ts) · [`StellarPaymentAdapter`](src/adapters/stellar.ts) | `envoy-pay/solana` · `/stellar` | Non-EVM settlement + watchers + request URIs |
+| [`UnifiedWallet`](src/wallet/unified-wallet.ts) | `envoy-pay/wallet` | Cross-chain wallet with intent resolution + chain routing |
+| [`FacilitatorService`](src/facilitator/facilitator-service.ts) | `envoy-pay/facilitator` | Hosted facilitator with fee calculation + receipts |
+| [402 gates](src/server/) | `envoy-pay/server` | Server-side x402 / MPP gating, webhook + receipt verification |
+| [Watchers](src/monitor/) | `envoy-pay/monitor` | EVM, Solana, Stellar payment monitoring (the EVM watcher is in core) |
+| [Contracts](#smart-contracts) | — | On-chain payment layer on Celo + canonical ERC-8004 |
 
 ---
 
@@ -159,7 +185,7 @@ npx hardhat run scripts/deploy.ts --network celo         # mainnet
 
 After deployment, paste the printed addresses into [`src/contracts/addresses.ts`](src/contracts/addresses.ts) — the SDK's viem clients pick them up automatically.
 
-A typed `EnvoyFacilitator` viem client + ERC-8004 helpers ship under `src/identity/` (in progress — see [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md)).
+A typed `EnvoyFacilitator` viem client ships under [`src/contracts/`](src/contracts/facilitator.ts) — exported from the core and from `envoy-pay/contracts` — and the canonical ERC-8004 helpers under [`src/identity/`](src/identity/) (`envoy-pay/identity`). Sign a `PaymentAuth`, call `pay()`, and decode `Settled` straight from TypeScript; build notes in [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
 
 ---
 
@@ -198,13 +224,14 @@ The `EnvoyClient` interceptor auto-detects which one the server is using on ever
 
 ## Examples
 
-| File | Demonstrates |
+| Example | Demonstrates |
 |---|---|
-| [`celo-quickstart.ts`](examples/celo-quickstart.ts) | Minimal Celo + cUSD payment |
+| [**`autonomous-loop/`**](examples/autonomous-loop/) | **The whole thesis, end to end** — an `EnvoyClient` agent hits a 402-gated API, settles through `EnvoyFacilitator` on Celo with an EIP-712 auth, retries, and gets the data. The merchant verifies the on-chain `Settled` event + the agent's ERC-8004 capability before serving. No human co-signs a step. Run with `npm run demo`. |
+| [`celo-quickstart.ts`](examples/celo-quickstart.ts) | Minimal Celo + cUSD payment via `EvmPaymentAdapter` |
 | [`ows-demo.ts`](examples/ows-demo.ts) | Open Wallet Standard integration |
-| [`xlayer-uniswap-agent.ts`](examples/xlayer-uniswap-agent.ts) | DEX-routed payments via OnchainOS |
+| [`xlayer-uniswap-agent.ts`](examples/xlayer-uniswap-agent.ts) · [`onchainos-xlayer-agent.ts`](examples/onchainos-xlayer-agent.ts) | DEX-routed payments on OKX X Layer via OnchainOS |
 
-Run any of them with `npx ts-node examples/<name>.ts` after setting the required env vars (each file documents its inputs at the top).
+The single-file examples run with `npx ts-node examples/<name>.ts` after you set the env vars each file documents at the top. The autonomous loop has its own [walkthrough](examples/autonomous-loop/README.md) and a zero-spend dry run.
 
 ---
 
@@ -213,8 +240,9 @@ Run any of them with `npx ts-node examples/<name>.ts` after setting the required
 ```bash
 npm install              # install SDK deps
 npm run typecheck        # tsc --noEmit
-npm test                 # vitest (501 tests)
-npm run build            # cjs + esm + types
+npm test                 # vitest — 500 passing (9 Stripe/OnchainOS integration tests skip without creds)
+npm run build            # cjs + esm + types (lean core + every subpath)
+npm run demo             # the autonomous loop — dry run by default
 
 npm run contracts:compile   # cd contracts && hardhat compile
 npm run contracts:test      # cd contracts && hardhat test
@@ -229,19 +257,22 @@ CI runs both workspaces on every push (see [`.github/workflows/ci.yml`](.github/
 ```
 envoy/
 ├── src/                      TypeScript SDK
+│   ├── index.ts              Lean Celo core — the default `envoy-pay` import
+│   ├── solana.ts, stellar.ts Subpath entry points (envoy-pay/solana, /stellar)
 │   ├── adapters/             EVM (Celo + 11 chains), Solana, Stellar, Stripe MPP, OWS
-│   ├── contracts/            viem clients + ABIs for the Solidity contracts
-│   ├── identity/             Agent identity, DID, reputation, owner registry
+│   ├── contracts/            EnvoyFacilitator viem client + ABI + deployed addresses
+│   ├── identity/             ERC-8004 helpers, DID, agent card, reputation
 │   ├── facilitator/          Hosted facilitator service + fee engine
-│   ├── monitor/              Payment watchers (EVM, Solana, Stellar)
+│   ├── monitor/              Payment watchers (EVM, Solana, Stellar, multi-chain)
+│   ├── providers/            OnchainOS (OKX) + cross-chain USDC bridge
 │   ├── requests/             EIP-681, SEP-7, Solana Pay URI builders
 │   ├── server/               Server-side gates (x402, MPP, webhook, receipt)
 │   └── wallet/               Unified multi-chain wallet
 ├── contracts/                Hardhat workspace
-│   ├── src/                  Solidity contracts (4 production + MockERC20 for tests)
+│   ├── src/                  EnvoyFacilitator.sol (+ mocks for tests)
 │   ├── test/                 Hardhat tests (23 specs)
 │   └── scripts/deploy.ts     Deployment script
-└── examples/                 Runnable usage examples
+└── examples/                 Runnable usage examples (incl. the autonomous loop)
 ```
 
 ---

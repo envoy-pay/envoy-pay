@@ -1,12 +1,31 @@
-// envoy — Celo-first agent payment SDK (x402 + MPP) with on-chain contracts
-// https://envoy.dev
+// envoy — Celo-first agent payment SDK (x402 + MPP)
+// https://github.com/JemIIahh/envoy
+//
+// The default import is the lean Celo core: the agent client, on-chain
+// settlement via the EnvoyFacilitator, ERC-8004 identity, an EVM payment
+// adapter + watcher, and EIP-681 request URIs. Everything else is opt-in via
+// subpath imports, so you only pay for what you use:
+//
+//   envoy-pay/server       402 gating middleware (x402 / MPP) + webhooks
+//   envoy-pay/wallet       unified multi-chain wallet abstraction
+//   envoy-pay/ows          Open Wallet Standard — local key mgmt + signing
+//   envoy-pay/stripe       Stripe MPP adapter (fiat + stablecoins)
+//   envoy-pay/solana       Solana adapter + watcher + Solana Pay URIs
+//   envoy-pay/stellar      Stellar adapter + watcher + SEP-7 URIs
+//   envoy-pay/okx          OnchainOS (OKX DEX aggregator)
+//   envoy-pay/bridge       cross-chain USDC bridge
+//   envoy-pay/monitor      every chain watcher (incl. multi-chain)
+//   envoy-pay/requests     every payment-request URI builder
+//   envoy-pay/facilitator  hosted facilitation service (revenue engine)
+//   envoy-pay/contracts    on-chain EnvoyFacilitator client (also re-exported here)
+//   envoy-pay/identity     ERC-8004 + identity primitives (also re-exported here)
 
-// Core
+// ── Core ──────────────────────────────────────────────────────────────────
 export { EnvoyClient, EnvoyClientOptions } from './client';
 export { PolicyEngine, BudgetPolicy } from './policy';
 export type { Logger } from './logger';
 
-// MPP Protocol utilities
+// ── Protocol — x402 + MPP ───────────────────────────────────────────────────
 export {
   parseMppChallenge,
   parseMppChallenges,
@@ -30,48 +49,11 @@ export type {
   MppIntent,
 } from './mpp';
 
-// Adapters — Universal EVM (recommended for on-chain x402)
+// ── On-chain x402 adapter — Celo and any EVM chain ──────────────────────────
 export { EvmPaymentAdapter, listEvmChains } from './adapters/evm';
 export type { EvmAdapterOptions, EvmChainName } from './adapters/evm';
 
-// Adapters — Stripe MPP (fiat + stablecoins via Shared Payment Tokens)
-export { StripePaymentAdapter } from './adapters/stripe';
-export type { StripeAdapterOptions } from './adapters/stripe';
-
-// Adapters — Stellar
-export { StellarPaymentAdapter } from './adapters/stellar';
-export type { StellarPaymentAdapterOptions } from './adapters/stellar';
-
-// Adapters — Solana (SOL + USDC SPL, mainnet/devnet/testnet)
-export { SolanaPaymentAdapter } from './adapters/solana';
-export type { SolanaAdapterOptions } from './adapters/solana';
-
-// Adapters — Base (backward compat, use EvmPaymentAdapter instead)
-export { BasePaymentAdapter } from './adapters/base';
-export type { BaseAdapterOptions } from './adapters/base';
-
-// Adapters — OWS (Open Wallet Standard — local key management + policy-gated signing)
-export {
-  createOwsAdapter,
-  createOwsPolicy,
-  createOwsAgentKey,
-  importOwsWallet,
-  importOwsWalletFromKey,
-  exportOwsWallet,
-  listOwsWallets,
-  deleteOwsWallet,
-} from './adapters/ows';
-export type { OwsAdapterOptions } from './adapters/ows';
-
-// Providers — OnchainOS (OKX DEX Aggregator, 400+ DEX sources, X Layer native)
-export { OnchainOSProvider, createOnchainOSFromEnv } from './providers/onchainos';
-export type { OnchainOSConfig, DexQuoteParams, DexSwapParams, DexQuoteResult, DexSwapResult } from './providers/onchainos';
-
-// Providers — Cross-Chain Bridge (9 chains, USDC bridge, two-step routing)
-export { CrossChainBridge } from './providers/bridge';
-export type { BridgeQuoteParams, BridgeQuoteResult, BridgeRoute, BridgeStatus, CrossChainBridgeConfig } from './providers/bridge';
-
-// Interface
+// ── Adapter interface — implement this to add a rail ────────────────────────
 export type {
   PaymentAdapter,
   WatchOptions,
@@ -81,80 +63,15 @@ export type {
   Unsubscribe,
 } from './adapters/types';
 
-// Server — Pay In: 402 gating middleware
-export {
-  createX402Gate,
-  createMppGate,
-  createPaymentGate,
-  createWebhookHandler,
-  buildReceipt,
-} from './server';
-export type {
-  X402GateConfig,
-  X402Proof,
-} from './server/x402-gate';
-export type {
-  MppGateConfig,
-} from './server/mpp-gate';
-export type {
-  PaymentGateConfig,
-} from './server/payment-gate';
-export type {
-  WebhookConfig,
-  WebhookEvent,
-} from './server/webhook';
-export type {
-  ReceiptOptions,
-  PaymentReceipt,
-} from './server/receipt';
-
-// Monitor — Pay In: Real-time payment watchers
-export {
-  createEvmWatcher,
-  createStellarWatcher,
-  createSolanaWatcher,
-  createMultiChainWatcher,
-} from './monitor';
+// ── Watch a Celo / EVM address for incoming payments ────────────────────────
+export { createEvmWatcher } from './monitor/evm-watcher';
 export type { EvmWatcherConfig } from './monitor/evm-watcher';
-export type { StellarWatcherConfig } from './monitor/stellar-watcher';
-export type { SolanaWatcherConfig } from './monitor/solana-watcher';
-export type { MultiChainWatcherConfig } from './monitor/multi-watcher';
 
-// Requests — Pay In: Payment request URI generators
-export {
-  buildEip681Uri,
-  buildSep7Uri,
-  buildSolanaPayUri,
-  buildPaymentUri,
-} from './requests';
+// ── Payment-request URIs — EIP-681 (Celo / EVM) ─────────────────────────────
+export { buildEip681Uri } from './requests/eip681';
 export type { Eip681Options } from './requests/eip681';
-export type { Sep7Options } from './requests/sep7';
-export type { SolanaPayOptions } from './requests/solana-pay';
-export type { UniversalPaymentUriOptions } from './requests/universal';
 
-// Wallet — Unified multi-chain wallet abstraction
-export {
-  UnifiedWallet,
-  BalanceAggregator,
-  ChainRouter,
-  IntentResolver,
-  SessionManager,
-} from './wallet';
-export type {
-  UnifiedWalletOptions,
-  UnifiedBalance,
-  ChainBalance,
-  PayIntent,
-  PaymentPlan,
-  PayResult,
-  RoutingStrategy,
-  Session,
-  SessionPermissions,
-  ChainMeta,
-} from './wallet';
-
-// Identity — Off-chain primitives (AgentIdentity, DIDResolver, ...) + canonical
-// ERC-8004 helpers under the `erc8004` namespace (registerAgent, giveFeedback, ...).
+// ── Identity — ERC-8004 (canonical) + off-chain primitives ──────────────────
 export {
   AgentIdentity,
   DIDResolver,
@@ -184,7 +101,7 @@ export type {
   FeedbackArgs,
 } from './identity';
 
-// Contracts — On-chain layer (Celo): the EnvoyFacilitator viem client.
+// ── Contracts — EnvoyFacilitator on-chain client (Celo) ─────────────────────
 export {
   ENVOY_CONTRACT_ADDRESSES,
   getEnvoyAddresses,
@@ -205,23 +122,3 @@ export type {
   EnvoyFacilitatorClient,
   EnvoyFacilitatorClientOptions,
 } from './contracts';
-
-// Facilitator — Revenue engine (hosted payment facilitation)
-export {
-  FacilitatorService,
-  FeeCalculator,
-  PRICING_TIERS,
-  CARD_TIERS,
-} from './facilitator';
-export type {
-  PricingPlan,
-  PricingTier,
-  ApiKeyRecord,
-  FacilitateRequest,
-  FacilitateResponse,
-  FeeBreakdown,
-  UsageRecord,
-  RevenueSummary,
-  CardPlan,
-  CardTier,
-} from './facilitator';
