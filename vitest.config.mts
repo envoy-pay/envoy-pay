@@ -26,16 +26,17 @@ export default defineConfig({
         'src/wallet/types.ts',
         '**/_legacy/**',
       ],
-      // Ratchet at the real current level (a green, honest gate that blocks
-      // regressions) rather than an aspirational 80% the suite doesn't yet meet.
-      // The shortfall is genuine: the ERC-8004 identity modules (reputation.ts,
-      // owner-registry.ts, agent-identity.ts, erc8004/identity.ts) are still
-      // lightly tested. Raise lines/statements back toward 80 as those land.
+      // Coverage gate. The pure identity modules (reputation, owner-registry,
+      // agent-identity) are now unit-tested, so the suite genuinely clears 80%
+      // lines/statements — see src/__tests__/{owner-registry,reputation,
+      // agent-identity}.test.ts. Remaining headroom is in the on-chain ERC-8004
+      // wrappers (erc8004/identity.ts, erc8004/reputation.ts), which need a
+      // mocked viem client to cover.
       thresholds: {
-        lines: 76,
+        lines: 80,
         functions: 80,
         branches: 70,
-        statements: 76,
+        statements: 80,
       },
     },
   },
