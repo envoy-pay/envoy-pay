@@ -47,6 +47,11 @@
       "import": "./dist/esm/facilitator/index.js",
       "require": "./dist/cjs/facilitator/index.js"
     },
+    "./payouts": {
+      "types": "./dist/types/payouts/index.d.ts",
+      "import": "./dist/esm/payouts/index.js",
+      "require": "./dist/cjs/payouts/index.js"
+    },
     "./ows": {
       "types": "./dist/types/adapters/ows.d.ts",
       "import": "./dist/esm/adapters/ows.js",

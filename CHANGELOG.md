@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 For the dated decision journal behind these changes, see [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
 
+## [Unreleased]
+
+### Added
+- **`envoy-pay/payouts`** — a pluggable "agent pays the real world" layer. A rail-agnostic `PayoutProvider` interface (`quote` → on-chain settle → dispatch) and a `PayoutRouter` that routes a target (`card` · `bill` · `giftcard` · `bank` · `mobile-money`) to the right rail. The facilitator stays the universal authorization core — the router's `pay()` takes an injected on-chain settle step, so every real-world payout still runs through the agent's on-chain spending policy + proof-of-human.
+- **`StripeCardPayoutProvider`** — the universal **card rail**: issues a stablecoin-backed virtual card via Stripe Issuing (`POST /v1/issuing/cardholders` + `/v1/issuing/cards` with the `crypto_wallet` block + `spending_controls`) linked to the agent's wallet, so an agent can pay anything that takes a Visa/Mastercard — subscriptions, domains, SaaS. Implements `CardIssuer` (`provisionCard`, `getCard`, `getCardSecrets`, `setSpendingControls`) plus `approvalRequirement()` for the non-custodial just-in-time ERC-20 approval. Private-preview / Bridge onboarding realities (and the Celo/cUSD funding caveat) documented inline.
+- **`createFacilitatorSettler(...)`** — bridges the payout layer to `createEnvoyFacilitator`: turns a `PayoutQuote` into a signed, policy-gated cUSD settlement and returns the proof, so `router.pay(req, settler)` is one call end-to-end.
+- `src/__tests__/payouts.test.ts` — 19 cases (router routing/expiry/dispatch, Stripe provisioning/quote/secrets/error handling, facilitator settler).
+- New `./payouts` subpath export.
+
 ## [0.2.0] — 2026-06-07
 
 The Celo-first re-imagining of the SDK with a real on-chain layer. Headlining this release: server-side on-chain settlement verification (`createOnchainVerifier`) and a formal security policy (`SECURITY.md`). Targets Celo Sepolia (testnet) and Celo mainnet.
