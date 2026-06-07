@@ -496,6 +496,22 @@ CI runs the SDK and the Hardhat contracts on every push (Node 20/22) — see [`.
 
 ---
 
+## Dependencies & security
+
+The core is deliberately lean. A default `npm i envoy-pay` pulls just **three runtime dependencies** — [`viem`](https://viem.sh), [`axios`](https://axios-http.com), and `@open-wallet-standard/core` — and audits clean:
+
+```bash
+$ npm i envoy-pay
+added 43 packages, audited 44 packages
+found 0 vulnerabilities
+```
+
+- **Optional rails are opt-in.** Solana, Stellar, and Stripe are *optional peer dependencies* — installed only if you import their subpath (`envoy-pay/solana`, `envoy-pay/stellar`, `envoy-pay/stripe`). They carry their own, much larger dependency trees; any advisories there originate from those upstream packages (e.g. `@solana/web3.js`), not from envoy — and you inherit them only if you opt into that rail.
+- **The Celo-first core stays vulnerability-free** regardless of which rails you add.
+- **Verify anytime:** run `npm i envoy-pay && npm audit` in a clean project — you'll see `found 0 vulnerabilities`.
+
+---
+
 ## Project layout
 
 ```
