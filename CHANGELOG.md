@@ -4,11 +4,13 @@ All notable changes to this project will be documented in this file.
 
 For the dated decision journal behind these changes, see [`docs/BUILD_LOG.md`](docs/BUILD_LOG.md).
 
-## [0.3.0-envoy] — Unreleased
+## [0.2.0] — 2026-06-07
 
-This release is the Celo-first re-imagining of the SDK with a real on-chain layer added. Targets Celo Sepolia (testnet) and Celo mainnet.
+The Celo-first re-imagining of the SDK with a real on-chain layer. Headlining this release: server-side on-chain settlement verification (`createOnchainVerifier`) and a formal security policy (`SECURITY.md`). Targets Celo Sepolia (testnet) and Celo mainnet.
 
 ### Added
+- **`createOnchainVerifier(...)`** (`envoy-pay/server`) — a ready-made `verifyPayment` for `createX402Gate` that confirms an x402 proof maps to a real on-chain `EnvoyFacilitator` `Settled` event: checks the tx succeeded, paid the right merchant in the right token for at least the asking amount, replay-guards each `challengeId`, and optionally requires an ERC-8004 capability. Promotes the autonomous-loop example's verification into the SDK so production gates don't re-implement it. Pluggable `ReplayStore` for multi-instance deployments. (12-test suite, `verify-onchain.test.ts`.)
+- **`SECURITY.md`** — security policy: pre-1.0 / unaudited status, on-chain trust model, deployed-contract list, the `verifyPayment` requirement, a production hardening checklist, and private vulnerability reporting.
 - Scaffold forked from `ASGCompute-ows-agent-pay`, restructured around Celo as the first-class chain
 - **`EnvoyFacilitator.sol`** — single on-chain payment contract that consumes an EIP-712 `PaymentAuth` from the agent's wallet, validates the signer against canonical ERC-8004 `getAgentWallet(agentId)`, enforces per-(agent, token) rolling-window spending limits atomically, splits the amount into net (→ merchant) and fee (→ treasury), and emits a `Settled(challengeId, agentId, merchant, …)` event. Strict CEI, custom errors, `ReentrancyGuardTransient`, ERC-1271 fallback for smart-wallet agents, zero internal balance (contract never holds funds).
 - `MockIdentityRegistry.sol` + `MockSmartWallet.sol` test fixtures
@@ -22,6 +24,7 @@ This release is the Celo-first re-imagining of the SDK with a real on-chain laye
 - `docs/BUILD_LOG.md` capturing the dated decision trail (architecture, demo, ERC-8004 interface notes, Facilitator design rationale, SDK design rationale)
 
 ### Changed
+- **`createX402Gate` now warns when no settlement verification is configured.** Its built-in checks only confirm a proof is well-formed, not that it settled on-chain — so without `verifyPayment` (or `facilitatorUrl`) it logs a one-time security warning at gate creation. Pass `allowUnverified: true` to acknowledge and silence it (demo/testnet/trusted-upstream only). Non-breaking.
 - **Testnet target switched from Celo Alfajores → Celo Sepolia** (chainId `11142220`). The canonical Celo ERC-8004 contracts are deployed on Sepolia; Alfajores is no longer a build target. `hardhat.config.ts` updated accordingly.
 - Top-level + `contracts/` READMEs updated to reflect the lean architecture (one on-chain payment layer + canonical ERC-8004 delegation)
 - **`src/contracts/addresses.ts`** rewritten: `EnvoyContractAddresses` shape is now `{ facilitator, identityRegistry, reputationRegistry }` (was four snowflake fields). Canonical 8004 addresses are baked in for both Celo mainnet (42220) and Celo Sepolia (11142220). New `CELO_MAINNET` / `CELO_SEPOLIA` chain-id constants exported.
@@ -37,6 +40,10 @@ This release is the Celo-first re-imagining of the SDK with a real on-chain laye
 - **`EnvoyFacilitator` is live on Celo mainnet** (chainId `42220`) at [`0xE268B6fE16319b49D22562C93c0d2395F65FCAcC`](https://celoscan.io/address/0xE268B6fE16319b49D22562C93c0d2395F65FCAcC), wired into `src/contracts/addresses.ts` alongside the canonical ERC-8004 Identity/Reputation registries.
 
 ---
+
+## Pre-fork history
+
+_The versions below are from the upstream project (`ASGCompute-ows-agent-pay`) that envoy was forked from, retained for provenance. envoy's npm lineage is the entries above (`0.1.0` → `0.2.0`)._
 
 ## [0.2.0] — 2026-04-04
 

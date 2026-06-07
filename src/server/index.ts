@@ -20,6 +20,11 @@
  * ```
  */
 export { createX402Gate, type X402GateConfig, type X402Proof } from './x402-gate';
+export {
+  createOnchainVerifier,
+  type OnchainVerifierConfig,
+  type ReplayStore,
+} from './verify-onchain';
 export { createMppGate, type MppGateConfig } from './mpp-gate';
 export { createPaymentGate, type PaymentGateConfig } from './payment-gate';
 export { createWebhookHandler, type WebhookConfig } from './webhook';

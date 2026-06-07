@@ -23,8 +23,14 @@ export interface X402GateConfig {
   usdAmount?: number;
   /** Facilitator URL for verification (optional). */
   facilitatorUrl?: string;
-  /** Verification function. If provided, called to verify X-PAYMENT proof. */
+  /** Verification function. If provided, called to verify X-PAYMENT proof.
+   *  Use `createOnchainVerifier(...)` (envoy-pay/server) to confirm the payment
+   *  actually settled on-chain — strongly recommended before charging real value. */
   verifyPayment?: (proof: X402Proof) => Promise<boolean> | boolean;
+  /** Acknowledge running WITHOUT settlement verification (silences the security
+   *  warning). The gate then trusts any well-formed proof — only safe for demos,
+   *  testnets, or when a trusted facilitator verifies upstream. Default: false. */
+  allowUnverified?: boolean;
   /** Logger function. */
   logger?: Logger;
 }
@@ -73,6 +79,19 @@ export function createX402Gate(config: X402GateConfig) {
   const log = config.logger ?? noopLogger;
   const version = config.x402Version ?? 2;
   const scheme = config.scheme ?? 'exact';
+
+  // The built-in checks only confirm the proof is well-formed and self-consistent
+  // (payTo/amount echo the challenge) — they do NOT confirm the payment settled.
+  // Without `verifyPayment`, anyone can craft a proof and be served for free.
+  if (!config.verifyPayment && !config.facilitatorUrl && !config.allowUnverified) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[x402-gate] ⚠ SECURITY: no `verifyPayment` configured — this gate accepts any ' +
+        'well-formed X-PAYMENT header WITHOUT confirming the payment settled on-chain. ' +
+        'Wire `createOnchainVerifier()` (envoy-pay/server) before charging real value, or ' +
+        'set `allowUnverified: true` to acknowledge and silence this. See SECURITY.md.',
+    );
+  }
 
   return async (
     req: GatedRequest,

@@ -1,6 +1,6 @@
 {
   "name": "envoy-pay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Celo-first agent payment SDK: x402 + MPP settlement, ERC-8004 identity, and on-chain spending policy via the EnvoyFacilitator. Optional Solana, Stellar, Stripe, DEX/bridge, and unified-wallet modules via subpath imports.",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",

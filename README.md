@@ -216,7 +216,7 @@ The core `EnvoyClient` handles protocol detection and the retry loop; pluggable 
 | [`SolanaPaymentAdapter`](src/adapters/solana.ts) · [`StellarPaymentAdapter`](src/adapters/stellar.ts) | `envoy-pay/solana` · `/stellar` | Non-EVM settlement + watchers + request URIs. |
 | [`UnifiedWallet`](src/wallet/unified-wallet.ts) | `envoy-pay/wallet` | Cross-chain wallet with intent resolution + chain routing. |
 | [`FacilitatorService`](src/facilitator/facilitator-service.ts) | `envoy-pay/facilitator` | Hosted facilitator with fee calculation + receipts. |
-| [402 gates](src/server/) | `envoy-pay/server` | Server-side x402 / MPP gating, webhook + receipt verification. |
+| [402 gates](src/server/) | `envoy-pay/server` | Server-side x402 / MPP gating + `createOnchainVerifier` (on-chain `Settled` verification), webhook + receipt verification. |
 | [Watchers](src/monitor/) | `envoy-pay/monitor` | EVM, Solana, Stellar payment monitoring (the EVM watcher ships in core). |
 
 > **Extensible:** add any rail by implementing the [`PaymentAdapter`](src/adapters/types.ts) interface.
@@ -224,19 +224,30 @@ The core `EnvoyClient` handles protocol detection and the retry loop; pluggable 
 ### Charge agents for *your* API (Pay In)
 
 ```ts
-import { createX402Gate } from 'envoy-pay/server';
+import { createX402Gate, createOnchainVerifier } from 'envoy-pay/server';
+import { CELO_MAINNET } from 'envoy-pay';
+
+// Confirm the payment actually settled on-chain — don't just trust the proof.
+const verifyPayment = createOnchainVerifier({
+  chainId: CELO_MAINNET,
+  payTo: '0xYOUR_TREASURY',
+  token: '0x765DE816845861e75A25fCA122bb6898B8B1282a', // cUSD
+  minAmount: 500000000000000000n,                       // 0.5 cUSD (18 decimals)
+  rpcUrl: process.env.CELO_RPC_URL,                     // or pass a viem publicClient
+});
 
 app.post('/api/premium', createX402Gate({
   payTo: '0xYOUR_TREASURY',
-  amount: '500000',          // 0.50 in 6-decimal stablecoin units
+  amount: '500000000000000000',
   asset: 'cUSD',
   network: 'eip155:42220',   // Celo
+  verifyPayment,             // ← verifies the on-chain Settled event
 }), (req, res) => {
   res.json({ data: 'premium content' });
 });
 ```
 
-Server returns `402` + challenge → agent pays on-chain → retries with proof → the gate verifies and serves `200 OK`. MPP gating (`createMppGate`) works the same way.
+Server returns `402` + challenge → agent pays on-chain → retries with proof → `createOnchainVerifier` confirms the `EnvoyFacilitator` `Settled` event (right merchant, token, amount; replay-guarded) → `200 OK`. **Without `verifyPayment` the gate accepts any well-formed proof and logs a warning** — never ship that for real value (see [SECURITY.md](SECURITY.md)). MPP gating (`createMppGate`) works the same way.
 
 ### Generate payment-request URIs
 
@@ -478,6 +489,19 @@ npm run contracts:test            # hardhat test (23 specs)
 | _… 35 suites total_ | **499 passing** (+9 integration tests skipped without creds) | + server gates, watchers, webhooks, contracts client |
 
 CI runs the SDK and the Hardhat contracts on every push (Node 20/22) — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## Security
+
+envoy-pay moves money, so it's gated **twice** — the client `PolicyEngine` *and*
+on-chain `EnvoyFacilitator` caps — and ships [`createOnchainVerifier`](src/server/verify-onchain.ts)
+so your server confirms a payment actually settled (right merchant, token, amount;
+replay-guarded) before serving. It is **pre-1.0 and the `EnvoyFacilitator` contract
+is not yet independently audited.**
+
+See **[SECURITY.md](SECURITY.md)** for the on-chain trust model, a production
+hardening checklist, and how to report a vulnerability.
 
 ---
 
